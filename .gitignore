@@ -21,6 +21,10 @@ backend/logs/*
 .vscode/
 .idea/
 
+.DS_Store
+.gitignore
+docker-compose.yml
+
 # Environment variables
 .env
 
