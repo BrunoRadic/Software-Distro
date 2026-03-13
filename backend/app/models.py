@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, BigInteger, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, String, Text, BigInteger, DateTime, ForeignKey, Float
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from app.database import Base
@@ -44,6 +44,9 @@ class Software(Base):
     os_compatibility = Column(String(50))  # Windows,Mac,Linux
     external_link = Column(String(255))
     screenshot_url = Column(String(255))
+    license = Column(String(50))
+    price_type = Column(String(20))
+    price = Column(Float)
     status = Column(String(20), default="pending")  # pending, approved, rejected
     download_count = Column(Integer, default=0)
     created_at = Column(DateTime, default=datetime.utcnow)
