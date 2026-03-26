@@ -271,8 +271,6 @@ async def upload_software(
         "status": new_software.status
     }
 
-
-
 @app.get("/software/{software_id}/download")
 async def download_software(
     software_id: int,
@@ -407,3 +405,20 @@ def list_software_authenticated(
         )
     
     return query.order_by(models.Software.created_at.desc()).all()
+
+
+@app.get("/software/{software_id}")
+async def get_software(
+    software_id: int,
+    db: Session = Depends(get_db)
+):
+    """Get softvera po Id-u"""
+
+    software = db.query(models.Software).filter(models.Software.id == software_id).first()
+
+    if not software:
+        raise HTTPException(status_code=404, detail="Software not found")
+    
+    return {
+        software
+    }

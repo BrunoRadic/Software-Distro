@@ -4,6 +4,7 @@ import { getUser, logout } from '../utils/auth';
 
 function Browse() {
   const [user, setUser] = useState(null);
+  const [software, setSoftware] = useState([]);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -13,6 +14,11 @@ function Browse() {
     } else {
       setUser(userData);
     }
+
+    fetch('http://localhost:8000/software/public')
+      .then(response => response.json())
+      .then(data => setSoftware(data))
+      .catch(err => console.error(err));
   }, [navigate]);
 
   const handleLogout = () => {
@@ -34,7 +40,19 @@ function Browse() {
         </div>
       </div>
 
-      <p>Software lista će biti ovdje...</p>
+{software.length > 0 ? (
+  software.map((app) => (
+    <div key={app.id} style={{ marginBottom: '10px' }}>
+      <h3>{app.title}</h3>
+      <p>{app.description}</p>
+      <p>Version: {app.version}</p>
+      <p>OS: {app.os_compatibility}</p>
+      <p>Downloads: {app.download_count}</p>
+    </div>
+  ))
+) : (
+  <p>Loading...</p>
+)}
     </div>
   );
 }
