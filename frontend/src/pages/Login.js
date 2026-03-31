@@ -80,6 +80,10 @@ function Login() {
         Don't have an account?{' '}
         <a href="/register" style={{ color: '#007bff' }}>
           Register
+        </a><br></br>
+        <br></br>
+        <a href="/browse" style={{ color: '#007bff' }}>
+          Continue as a guest
         </a>
       </p>
     </div>

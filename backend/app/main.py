@@ -180,7 +180,7 @@ def require_developer(current_user: models.User = Depends(get_current_user)) -> 
     return current_user
 
 # Dopustene ekstenzije
-ALLOWED_EXTENSIONS = {'.exe', '.zip', '.dmg', '.AppImage', '.deb', '.rpm', '.tar.gz'}
+ALLOWED_EXTENSIONS = {'.exe', '.zip', '.dmg', '.AppImage', '.deb', '.rpm', '.tar.gz', '.tar'}
 MAX_FILE_SIZE = 500 * 1024 * 1024  # 500 MB
 
 
@@ -419,6 +419,32 @@ async def get_software(
     if not software:
         raise HTTPException(status_code=404, detail="Software not found")
     
+    developer = db.query(models.User).filter(models.User.id == software.developer_id).first()
+
+    category = db.query(models.Category).filter(models.Category.id == software.category_id).first()
+
+
+
     return {
-        software
+        "id": software.id,
+        "title": software.title,
+        "description": software.description,
+        "version": software.version,
+        "os_compatibility": software.os_compatibility,
+        "license": software.license,
+        "price_type": software.price_type,
+        "price": software.price,
+        "file_size": software.file_size,
+        "download_count": software.download_count,
+        "status": software.status,
+        "created_at": software.created_at,
+        "external_link": software.external_link,
+        "developer": {
+            "id": developer.id,
+            "username": developer.username
+        } if developer else None,
+        "category": {
+            "id": category.id,
+            "name": category.name
+        } if category else None
     }
