@@ -57,44 +57,6 @@ function Browse() {
         borderBottom: '2px solid #e0e0e0'
       }}>
         <h1 style={{ margin: 0, fontSize: '28px' }}>Browse Software</h1>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-          <span style={{ color: '#666' }}>
-            {user ? (
-              <>Welcome, <strong>{user.username}</strong>!</>
-            ) : (
-              <>Welcome, human!</>
-            )}
-          </span>
-          {user && (
-            <>
-              <span style={{ 
-                marginLeft: '8px',
-                padding: '4px 8px',
-                background: user.role === 'admin' ? '#ff6b6b' : user.role === 'developer' ? '#4ecdc4' : '#95e1d3',
-                color: 'white',
-                borderRadius: '4px',
-                fontSize: '12px',
-                fontWeight: 'bold'
-              }}>
-                {user.role?.toUpperCase() || 'GUEST'}
-              </span>
-              <button 
-                onClick={handleLogout}
-                style={{
-                  padding: '8px 16px',
-                  background: '#ff6b6b',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  fontWeight: '500'
-                }}
-              >
-                Logout
-              </button>
-            </>
-          )}
-        </div>
       </div>
 
       {/* Loading State */}

@@ -448,3 +448,14 @@ async def get_software(
             "name": category.name
         } if category else None
     }
+
+@app.get("/categories")
+def list_categories(db: Session = Depends(get_db)):
+    """Lista svih kategorija"""
+
+    categories = db.query(models.Category).all()
+
+    return[
+        {"id": cat.id, "name": cat.name, "slug": cat.slug}
+        for cat in categories
+    ]
