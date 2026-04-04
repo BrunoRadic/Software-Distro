@@ -91,8 +91,8 @@ function SoftwareAdminCard({ software, onApprove, onReject, onDelete }) {
         color: '#636e72'
       }}>
         <span>Developer: <strong>{software?.developer?.username || 'Unknown'}</strong></span>
-        <span>Category: <strong>{software.category_id?.name || 'N/A'}</strong></span>
-        <span>⬇Downloads: <strong>{software.download_count}</strong></span>
+        <span>Category: <strong>{software.category?.name || 'N/A'}</strong></span>
+        <span>Downloads: <strong>{software.download_count}</strong></span>
         <span>License: <strong>{software.license || 'N/A'}</strong></span>
         <span>{software.price_type === 'free' ? 'Free' : `$${software.price || '?'}`}</span>
       </div>

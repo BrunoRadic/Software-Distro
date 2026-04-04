@@ -7,6 +7,7 @@ import UploadSoftware from './pages/UploadSoftware';
 import ProtectedRoute from './components/ProtectedRoute';
 import Navbar from './components/Navbar';
 import AdminPanel from './pages/AdminPanel';
+import Register from './pages/Register';
 
 function App() {
   return (
@@ -15,6 +16,7 @@ function App() {
       <Routes>
         <Route path="/" element={<Navigate to="/browse" />} />
         <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
         <Route path="/browse" element={<Browse />} />
         <Route path="/software/:id" element={<SoftwareDetails />} />
         <Route 

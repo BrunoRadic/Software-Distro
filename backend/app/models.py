@@ -1,6 +1,6 @@
 from sqlalchemy import Column, Integer, String, Text, BigInteger, DateTime, ForeignKey, Float
 from sqlalchemy.orm import relationship
-from datetime import datetime
+from datetime import datetime, timezone
 from app.database import Base
 
 class User(Base):
@@ -11,7 +11,7 @@ class User(Base):
     email = Column(String(100), unique=True, nullable=False)
     password_hash = Column(String(255), nullable=False)
     role = Column(String(20), default="user")  # user, developer, admin
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.now(timezone.utc))
     
     # Relationships
     uploaded_software = relationship("Software", back_populates="developer")
@@ -49,8 +49,8 @@ class Software(Base):
     price = Column(Float)
     status = Column(String(20), default="pending")  # pending, approved, rejected
     download_count = Column(Integer, default=0)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.now(timezone.utc))
+    updated_at = Column(DateTime, default=datetime.now(timezone.utc), onupdate=datetime.now(timezone.utc))
     
     # Relationships
     developer = relationship("User", back_populates="uploaded_software")
@@ -65,7 +65,7 @@ class Download(Base):
     id = Column(Integer, primary_key=True, index=True)
     software_id = Column(Integer, ForeignKey("software.id"))
     user_id = Column(Integer, ForeignKey("users.id"))
-    downloaded_at = Column(DateTime, default=datetime.utcnow)
+    downloaded_at = Column(DateTime, default=datetime.now(timezone.utc))
     
     # Relationships
     software = relationship("Software", back_populates="downloads")
@@ -78,7 +78,7 @@ class Favorite(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"))
     software_id = Column(Integer, ForeignKey("software.id"))
-    added_at = Column(DateTime, default=datetime.utcnow)
+    added_at = Column(DateTime, default=datetime.now(timezone.utc))
     
     # Relationships
     user = relationship("User", back_populates="favorites")

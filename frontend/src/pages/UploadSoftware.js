@@ -10,7 +10,6 @@ function UploadSoftware() {
     description: '',
     version: '',
     category_id: '',
-    os_compatibility: '',
     license: '',
     price_type: 'free',
     price: '',
@@ -20,6 +19,11 @@ function UploadSoftware() {
   
   const [categories, setCategories] = useState([]);
   const [uploading, setUploading] = useState(false);
+  const [osSupport, setOsSupport] = useState({
+        Windows: false,
+        Mac: false,
+        Linux: false
+    }); 
 
   useEffect(() => {
     // Fetch categories
@@ -32,6 +36,13 @@ function UploadSoftware() {
     setFormData({
       ...formData,
       [e.target.name]: e.target.value
+    });
+  };
+
+  const handleOsChange = (os) => {
+    setOsSupport({
+        ...osSupport,
+        [os]: !osSupport[os]
     });
   };
 
@@ -66,12 +77,18 @@ function UploadSoftware() {
       return;
     }
 
+    const selectedOS = Object.keys(osSupport).filter(os => osSupport[os]);
+    if (selectedOS.length === 0) {
+        alert('Please select at least one OS');
+        return;
+    }
+
     const data = new FormData();
     data.append('title', formData.title);
     data.append('description', formData.description);
     data.append('version', formData.version);
     data.append('category_id', formData.category_id);
-    data.append('os_compatibility', formData.os_compatibility);
+    data.append('os_compatibility', selectedOS.join(','));
     data.append('license', formData.license);
     data.append('price_type', formData.price_type);
     
@@ -236,23 +253,92 @@ function UploadSoftware() {
           marginBottom: '20px'
         }}>
           {/* OS Compatibility */}
-          <div>
-            <label style={labelStyle}>
-              OS Compatibility <span style={{ color: '#ff6b6b' }}>*</span>
-            </label>
+        <div>
+        <label style={labelStyle}>
+            OS Compatibility <span style={{ color: '#ff6b6b' }}>*</span>
+        </label>
+        
+        <div style={{ 
+            display: 'flex', 
+            gap: '20px',
+            padding: '12px',
+            background: '#f8f9fa',
+            borderRadius: '4px',
+            border: '1px solid #dee2e6'
+        }}>
+            <label style={{ 
+            display: 'flex', 
+            alignItems: 'center',
+            gap: '8px',
+            cursor: 'pointer',
+            fontSize: '15px',
+            fontWeight: '500'
+            }}>
             <input
-              type="text"
-              name="os_compatibility"
-              value={formData.os_compatibility}
-              onChange={handleChange}
-              required
-              placeholder="e.g., Windows,Mac,Linux"
-              style={inputStyle}
+                type="checkbox"
+                checked={osSupport.Windows}
+                onChange={() => handleOsChange('Windows')}
+                style={{ 
+                width: '18px', 
+                height: '18px',
+                cursor: 'pointer'
+                }}
             />
-            <small style={{ color: '#999', fontSize: '12px' }}>
-              Comma-separated (e.g., Windows,Mac,Linux)
-            </small>
-          </div>
+            Windows
+            </label>
+
+            <label style={{ 
+            display: 'flex', 
+            alignItems: 'center',
+            gap: '8px',
+            cursor: 'pointer',
+            fontSize: '15px',
+            fontWeight: '500'
+            }}>
+            <input
+                type="checkbox"
+                checked={osSupport.Mac}
+                onChange={() => handleOsChange('Mac')}
+                style={{ 
+                width: '18px', 
+                height: '18px',
+                cursor: 'pointer'
+                }}
+            />
+            Mac
+            </label>
+
+            <label style={{ 
+            display: 'flex', 
+            alignItems: 'center',
+            gap: '8px',
+            cursor: 'pointer',
+            fontSize: '15px',
+            fontWeight: '500'
+            }}>
+            <input
+                type="checkbox"
+                checked={osSupport.Linux}
+                onChange={() => handleOsChange('Linux')}
+                style={{ 
+                width: '18px', 
+                height: '18px',
+                cursor: 'pointer'
+                }}
+            />
+            Linux
+            </label>
+        </div>
+
+        <small style={{ 
+            display: 'block',
+            marginTop: '6px',
+            color: '#999', 
+            fontSize: '12px' 
+        }}>
+            Select all operating systems your software supports
+        </small>
+        </div>
 
           {/* License */}
           <div>

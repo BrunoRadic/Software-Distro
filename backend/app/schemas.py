@@ -27,6 +27,14 @@ class Token(BaseModel):
     token_type: str
     user: UserResponse
 
+class DeveloperInfo(BaseModel):
+    id: int
+    username: str
+
+class CategoryInfo(BaseModel):
+    id: int
+    name: str
+
 class SoftwareResponse(BaseModel):
     id: int
     title: str
@@ -36,10 +44,17 @@ class SoftwareResponse(BaseModel):
     category_id: int
     file_size: int
     os_compatibility: str
+    license: Optional[str]
+    price_type: Optional[str]
+    price: Optional[float]
     external_link: Optional[str]
     status: str
     download_count: int
     created_at: datetime
+    
+    # ✅ DODAJ OVO
+    developer: Optional[DeveloperInfo] = None
+    category: Optional[CategoryInfo] = None
     
     class Config:
         from_attributes = True
