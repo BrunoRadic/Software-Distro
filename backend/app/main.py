@@ -302,12 +302,24 @@ async def upload_software(
 @app.get("/software/{software_id}/download")
 async def download_software(
     software_id: int,
+    version_id: Optional[int] = None,
     current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Download softvera; presigned URL"""
-    
-    software = db.query(models.Software).filter(models.Software.id == software_id).first()
+
+
+    if version_id:
+        software = db.query(models.Software).filter(models.Software.id == version_id).first()
+    else:  
+        software = db.query(models.Software).filter(models.Software.id == software_id).first()
+
+        if software and not software.is_latest_version:
+            parent_id = software.parent_software_id if software.parent_software_id else software.id
+            software = db.query(models.Software).filter(
+                models.Software.parent_software_id == parent_id,
+                models.Software.is_latest_version == True
+            ).first()
     
     if not software:
         raise HTTPException(status_code=404, detail="Software not found")
@@ -332,6 +344,7 @@ async def download_software(
     return {
         "download_url": download_url,
         "filename": os.path.basename(software.file_path),
+        "version": software.version,
         "expires_in": "1 hour"
     }
 
@@ -401,8 +414,11 @@ def list_software_public(
     category_id: Optional[int] = None,
     db: Session = Depends(get_db)
 ):
-    """Javna lista, samo approved"""
-    query = db.query(models.Software).filter(models.Software.status == "approved")
+    """Javna lista, samo approved latest verzije"""
+    query = db.query(models.Software).filter(
+        models.Software.status == "approved",
+        models.Software.is_latest_version == True
+        )
     
     if category_id:
         query = query.filter(models.Software.category_id == category_id)
@@ -418,21 +434,55 @@ def list_software_authenticated(
     db: Session = Depends(get_db)
 ):
     """Logirani, approved + svoje pending, admin vidi sve"""
-    query = db.query(models.Software)
-    
-    if category_id:
-        query = query.filter(models.Software.category_id == category_id)
     
     if current_user.role == "admin":
+        query = db.query(models.Software)
         if status_filter:
             query = query.filter(models.Software.status == status_filter)
     else:
-        query = query.filter(
-            (models.Software.status == "approved") |
+        query = db.query(models.Software).filter(
+            (models.Software.status == "approved" and models.Software.is_latest_version == True) |
             (models.Software.developer_id == current_user.id)
         )
     
-    return query.order_by(models.Software.created_at.desc()).all()
+    if category_id:
+        query = query.filter(models.Software.category_id == category_id)
+
+    software_list = query.order_by(models.Software.created_at.desc()).all()
+
+    result = []
+    for sw in software_list:
+        developer = db.query(models.User).filter(models.User.id == sw.developer_id).first()
+        category = db.query(models.Category).filter(models.Category.id == sw.category_id).first()
+        
+        sw_dict = {
+            "id": sw.id,
+            "title": sw.title,
+            "description": sw.description,
+            "version": sw.version,
+            "developer_id": sw.developer_id,
+            "category_id": sw.category_id,
+            "file_size": sw.file_size,
+            "os_compatibility": sw.os_compatibility,
+            "license": sw.license,
+            "price_type": sw.price_type,
+            "price": sw.price,
+            "external_link": sw.external_link,
+            "status": sw.status,
+            "download_count": sw.download_count,
+            "created_at": sw.created_at,
+            "developer": {
+                "id": developer.id,
+                "username": developer.username
+            } if developer else None,
+            "category": {
+                "id": category.id,
+                "name": category.name
+            } if category else None
+        }
+        result.append(sw_dict)
+    
+    return result
 
 
 @app.get("/software/{software_id}")
@@ -487,3 +537,125 @@ def list_categories(db: Session = Depends(get_db)):
         {"id": cat.id, "name": cat.name, "slug": cat.slug}
         for cat in categories
     ]
+
+
+@app.post("/software/{software_id}/upload-version", status_code=status.HTTP_201_CREATED)
+async def upload_new_version(
+    software_id: int,
+    version: str = Form(...),
+    description: str = Form(...),
+    file: UploadFile = File(...),
+    current_user: models.User = Depends(require_developer),
+    db: Session = Depends(get_db)
+):
+    """Upload nove verzije postojeceg sotfvera"""
+
+    original = (db.query(models.Software)).filter(
+        models.Software.id == software_id
+    ).first()
+
+    if not original:
+        raise HTTPException(status_code=404, detail="Software not found")
+    
+    if  original.developer_id != current_user.id and current_user.role != "admin":
+        raise HTTPException(
+            status_code=403,
+            detail="You can only upload version of your own software"
+        )
+    
+    
+    file_size = 0
+    temp_file = f"/tmp/{uuid.uuid4()}_{file.filename}"
+
+    with open(temp_file, "wb") as buffer:
+        while chunk := await file.read(1024 * 1024):
+            file_size += len(chunk)
+            buffer.write(chunk)
+    
+    validate_file(file.filename, file_size)
+    
+    # Generate unique object name
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    file_ext = os.path.splitext(file.filename)[1]
+    object_name = f"software/{timestamp}_{uuid.uuid4()}{file_ext}"
+
+    if not storage.upload_file_to_storage(temp_file, object_name):
+        os.remove(temp_file)
+        raise HTTPException(
+            status_code=500,
+            detail="File upload failed"
+        )
+    os.remove(temp_file)
+
+    parent_id = original.parent_software_id if original.parent_software_id else original.id
+
+    db.query(models.Software).filter(
+        (models.Software.id == parent_id) |
+        (models.Software.parent_software_id == parent_id)
+    ).update({"is_latest_version": False})
+
+    new_version = models.Software(
+        title = original.title,
+        description = description,
+        version = version,
+        developer_id=original.developer_id,
+        category_id=original.category_id,
+        file_path = object_name,
+        file_size = file_size,
+        os_compatibility = original.os_compatibility,
+        license = original.license,
+        price_type = original.price_type,
+        price = original.price,
+        external_link = original.external_link,
+        parent_software_id = parent_id,
+        is_latest_version = True,
+        status = "pending"
+    )
+
+    db.add(new_version)
+    db.commit()
+    db.refresh(new_version)
+
+    return {
+        "message": "New version uploaded successfully. Waiting for admin approval.",
+        "version_id": new_version.id,
+        "version": new_version.version,
+        "parent_id": parent_id
+    }
+
+@app.get("/software/{software_id}/versions")
+def get_software_versions(
+    software_id: int,
+    db: Session = Depends(get_db)
+):
+    """Dohvati sve verzije softvera"""
+
+
+    software = db.query(models.Software).filter(
+        models.Software.id == software_id
+    ).first()
+
+    if not software:
+        raise HTTPException(status_code=404, detail="Software not found")
+    
+    parent_id = software.parent_software_id if software.parent_software_id else software.id
+
+    all_versions = db.query(models.Software).filter(
+        (models.Software.id == parent_id) |
+        (models.Software.parent_software_id == parent_id)
+    ).order_by(models.Software.created_at.desc()).all()
+
+    approved_versions = [v for v in all_versions if v.status == "approved"]
+    
+    return [
+        {
+            "id": v.id,
+            "version": v.version,
+            "created_at": v.created_at,
+            "file_size": v.file_size,
+            "download_count": v.download_count,
+            "is_latest": v.is_latest_version,
+            "description": v.description
+        }
+        for v in approved_versions
+    ] 

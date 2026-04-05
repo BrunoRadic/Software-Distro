@@ -8,6 +8,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 import Navbar from './components/Navbar';
 import AdminPanel from './pages/AdminPanel';
 import Register from './pages/Register';
+import UploadVersion from './pages/UploadVersion';
 
 function App() {
   return (
@@ -24,6 +25,14 @@ function App() {
           element={
             <ProtectedRoute requiredRole="developer">
               <UploadSoftware />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/upload-version/:id" 
+          element={
+            <ProtectedRoute requiredRole="developer">
+              <UploadVersion />
             </ProtectedRoute>
           } 
         />

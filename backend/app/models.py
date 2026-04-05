@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, BigInteger, DateTime, ForeignKey, Float
+from sqlalchemy import Column, Integer, String, Text, BigInteger, DateTime, ForeignKey, Float, Boolean
 from sqlalchemy.orm import relationship
 from datetime import datetime, timezone
 from app.database import Base
@@ -51,12 +51,24 @@ class Software(Base):
     download_count = Column(Integer, default=0)
     created_at = Column(DateTime, default=datetime.now(timezone.utc))
     updated_at = Column(DateTime, default=datetime.now(timezone.utc), onupdate=datetime.now(timezone.utc))
+    parent_software_id = Column(Integer, ForeignKey("software.id"), nullable=True)
+    is_latest_version = Column(Boolean, default=True)
     
     # Relationships
     developer = relationship("User", back_populates="uploaded_software")
     category = relationship("Category", back_populates="software")
     downloads = relationship("Download", back_populates="software")
     favorites = relationship("Favorite", back_populates="software")
+    parent = relationship(
+    "Software",
+    remote_side=[id],
+    back_populates="versions"
+    )
+
+    versions = relationship(
+        "Software",
+        back_populates="parent"
+    )
 
 
 class Download(Base):

@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../services/api';
-import { isAuthenticated } from '../utils/auth';
+import { isAuthenticated, getUser } from '../utils/auth';
+
 
 function SoftwareDetails() {
   const { id } = useParams();
@@ -11,11 +12,28 @@ function SoftwareDetails() {
   const [loading, setLoading] = useState(true);
   const [downloading, setDownloading] = useState(false);
   const [error, setError] = useState(null);
+  const [versions, setVersions] = useState([]);
+  const [selectedVersion, setSelectedVersion] = useState(null);
+  const [versionData, setVersionData] = useState({
+        version: '',
+        file_size: 0,
+        created_at: '',
+        download_count: 0,
+        description: ''
+        });
 
   useEffect(() => {
     api.get(`/software/${id}`)
       .then(response => {
         setSoftware(response.data);
+        setVersionData({
+            version: response.data.version,
+            file_size: response.data.file_size,
+            created_at: response.data.created_at,
+            download_count: response.data.download_count,
+            description: response.data.description
+      });
+        setSelectedVersion(response.data.id);
         setLoading(false);
       })
       .catch(err => {
@@ -23,7 +41,31 @@ function SoftwareDetails() {
         setError(err.response?.data?.detail || 'Failed to load software');
         setLoading(false);
       });
+
+    api.get(`/software/${id}/versions`)
+    .then(response => {
+      setVersions(response.data);
+    })
+    .catch(err => {
+      console.error('Error fetching versions:', err);
+    });
   }, [id]);
+
+  useEffect(() => {
+  if (!selectedVersion || !versions.length) return;
+  
+  const selectedVersionData = versions.find(v => v.id === selectedVersion);
+  
+  if (selectedVersionData) {
+    setVersionData({
+      version: selectedVersionData.version,
+      file_size: selectedVersionData.file_size,
+      created_at: selectedVersionData.created_at,
+      download_count: selectedVersionData.download_count,
+      description: selectedVersionData.description
+    });
+  }
+}, [selectedVersion, versions]);
 
   const handleDownload = async () => {
     if (!isAuthenticated()) {
@@ -34,7 +76,7 @@ function SoftwareDetails() {
     setDownloading(true);
     
     try {
-      const response = await api.get(`/software/${id}/download`);
+      const response = await api.get(`/software/${id}/download?version_id=${selectedVersion}`);
       const { download_url } = response.data;
       
       window.open(download_url, '_blank');
@@ -210,6 +252,65 @@ function SoftwareDetails() {
           </button>
         )}
       </div>
+      
+      {/* Version Selector - ako ima vise verzija */}
+        {versions.length > 1 && (
+        <div style={{ 
+            marginBottom: '20px',
+            padding: '15px',
+            background: '#f8f9fa',
+            borderRadius: '4px'
+        }}>
+            <label style={{
+            display: 'block',
+            marginBottom: '8px',
+            fontSize: '14px',
+            fontWeight: '600',
+            color: '#2d3436'
+            }}>
+            Select Version to Download:
+            </label>
+            
+            <select
+            value={selectedVersion}
+            onChange={(e) => setSelectedVersion(parseInt(e.target.value))}
+            style={{
+                width: '100%',
+                padding: '10px',
+                fontSize: '15px',
+                border: '1px solid #dee2e6',
+                borderRadius: '4px',
+                cursor: 'pointer'
+            }}
+            >
+            {versions.map(v => (
+                <option key={v.id} value={v.id}>
+                v{v.version} 
+                {v.is_latest && ' (Latest)'} 
+                - {new Date(v.created_at).toLocaleDateString()}
+                </option>
+            ))}
+            </select>
+        </div>
+        )}
+
+        {(getUser()?.role === "admin" || software?.developer?.id === getUser()?.id) && (
+        <button
+            onClick={() => navigate(`/upload-version/${id}`)}
+            style={{
+            padding: '10px 20px',
+            background: '#ffc107',
+            color: '#333',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            fontWeight: '600',
+            marginBottom: '20px'
+            }}
+        >
+            Upload New Version
+        </button>
+        )}
 
       {/* Main Content Card */}
       <div style={{ 
@@ -243,7 +344,7 @@ function SoftwareDetails() {
             color: '#636e72',
             fontWeight: '500'
           }}>
-            Version {software?.version}
+            Version {versionData.version}
           </span>
           
           <span style={{ 
@@ -295,7 +396,7 @@ function SoftwareDetails() {
             color: '#636e72',
             whiteSpace: 'pre-wrap'
           }}>
-            {software?.description || 'No description available.'}
+            {versionData.description || 'No description available.'}
           </p>
         </div>
 
@@ -348,7 +449,7 @@ function SoftwareDetails() {
               margin: 0,
               fontWeight: '500'
             }}>
-              {formatFileSize(software?.file_size)}
+              {formatFileSize(versionData.file_size)}
             </p>
           </div>
 
@@ -368,7 +469,7 @@ function SoftwareDetails() {
               margin: 0,
               fontWeight: '500'
             }}>
-              {software?.download_count || 0}
+              {versionData.download_count || 0}
             </p>
           </div>
 
@@ -388,7 +489,7 @@ function SoftwareDetails() {
               margin: 0,
               fontWeight: '500'
             }}>
-              {formatDate(software?.created_at)}
+              {formatDate(versionData.created_at)}
             </p>
           </div>
 
