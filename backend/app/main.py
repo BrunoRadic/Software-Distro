@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.database import engine, SessionLocal
 from app import models
-from app.routers import auth, software, admin, categories, ratings
+from app.routers import auth, software, admin, categories, ratings, favorites
 
 models.Base.metadata.create_all(bind=engine)
 
@@ -36,6 +36,7 @@ app.include_router(software.router)
 app.include_router(admin.router)
 app.include_router(categories.router)
 app.include_router(ratings.router)
+app.include_router(favorites.router)
 
 
 @app.get("/")

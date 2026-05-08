@@ -38,11 +38,18 @@ function Navbar() {
 
       {/* Links */}
       <div style={{ display: 'flex', gap: '20px', alignItems: 'center' }}>
-        <button 
+        <button
           onClick={() => navigate('/browse')}
           style={linkButtonStyle}
         >
           Browse
+        </button>
+
+        <button
+          onClick={() => navigate('/favorites')}
+          style={linkButtonStyle}
+        >
+          Favorites
         </button>
 
         {/* Upload - samo za developer/admin */}

@@ -19,6 +19,9 @@ function SoftwareDetails() {
   const [downloading, setDownloading] = useState(null);  // platform string or 'legacy'
   const [downloadError, setDownloadError] = useState(null);
 
+  const [isFavorited, setIsFavorited] = useState(false);
+  const [favLoading, setFavLoading] = useState(false);
+
   const [ratings, setRatings] = useState([]);
   const [avgScore, setAvgScore] = useState(null);
   const [userRating, setUserRating] = useState(null);
@@ -63,6 +66,12 @@ function SoftwareDetails() {
         }
       })
       .catch(() => {});
+
+    if (isAuthenticated()) {
+      api.get(`/favorites/${id}/status`)
+        .then(r => setIsFavorited(r.data.is_favorited))
+        .catch(() => {});
+    }
   }, [id]);
 
   // When selected version changes, update versionData and load its files
@@ -167,6 +176,24 @@ function SoftwareDetails() {
       .finally(() => setRatingLoading(false));
   };
 
+  const handleToggleFavorite = async () => {
+    if (!isAuthenticated()) { navigate('/login'); return; }
+    setFavLoading(true);
+    try {
+      if (isFavorited) {
+        await api.delete(`/favorites/${id}`);
+        setIsFavorited(false);
+      } else {
+        await api.post(`/favorites/${id}`);
+        setIsFavorited(true);
+      }
+    } catch (err) {
+      console.error('Favorite toggle failed:', err);
+    } finally {
+      setFavLoading(false);
+    }
+  };
+
   const formatFileSize = (bytes) => {
     if (!bytes) return 'N/A';
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
@@ -232,9 +259,27 @@ function SoftwareDetails() {
           ← Back to Browse
         </button>
 
-        {/* Download buttons */}
+        {/* Download buttons + favorite */}
         {isAuthenticated() ? (
-          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+            <button
+              onClick={handleToggleFavorite}
+              disabled={favLoading}
+              title={isFavorited ? 'Remove from favorites' : 'Add to favorites'}
+              style={{
+                padding: '10px 14px',
+                background: isFavorited ? '#fff3cd' : 'white',
+                color: isFavorited ? '#e67e22' : '#636e72',
+                border: `1px solid ${isFavorited ? '#e67e22' : '#dee2e6'}`,
+                borderRadius: '4px',
+                cursor: favLoading ? 'not-allowed' : 'pointer',
+                fontSize: '20px',
+                lineHeight: 1,
+                transition: 'all 0.2s'
+              }}
+            >
+              {isFavorited ? '★' : '☆'}
+            </button>
             {softwareFiles.length > 0 ? (
               softwareFiles.map(f => {
                 const isDown = downloading === f.platform;

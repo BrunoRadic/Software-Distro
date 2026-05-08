@@ -9,6 +9,7 @@ import Navbar from './components/Navbar';
 import AdminPanel from './pages/AdminPanel';
 import Register from './pages/Register';
 import UploadVersion from './pages/UploadVersion';
+import Favorites from './pages/Favorites';
 
 function App() {
   return (
@@ -19,6 +20,14 @@ function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/browse" element={<Browse />} />
+        <Route
+          path="/favorites"
+          element={
+            <ProtectedRoute>
+              <Favorites />
+            </ProtectedRoute>
+          }
+        />
         <Route path="/software/:id" element={<SoftwareDetails />} />
         <Route 
           path="/upload" 
