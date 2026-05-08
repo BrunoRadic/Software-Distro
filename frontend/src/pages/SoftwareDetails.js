@@ -19,6 +19,14 @@ function SoftwareDetails() {
   const [downloading, setDownloading] = useState(null);  // platform string or 'legacy'
   const [downloadError, setDownloadError] = useState(null);
 
+  const [ratings, setRatings] = useState([]);
+  const [avgScore, setAvgScore] = useState(null);
+  const [userRating, setUserRating] = useState(null);
+  const [ratingForm, setRatingForm] = useState({ score: 5, comment: '' });
+  const [editMode, setEditMode] = useState(false);
+  const [ratingLoading, setRatingLoading] = useState(false);
+  const [ratingError, setRatingError] = useState(null);
+
   useEffect(() => {
     api.get(`/software/${id}`)
       .then(response => {
@@ -42,6 +50,19 @@ function SoftwareDetails() {
     api.get(`/software/${id}/versions`)
       .then(r => setVersions(r.data))
       .catch(err => console.error('Error fetching versions:', err));
+
+    api.get(`/ratings/${id}`)
+      .then(r => {
+        setRatings(r.data.ratings);
+        setAvgScore(r.data.average_score);
+        const currentUser = getUser();
+        if (currentUser) {
+          const own = r.data.ratings.find(rt => rt.user.id === currentUser.id) || null;
+          setUserRating(own);
+          if (own) setRatingForm({ score: own.score, comment: own.comment || '' });
+        }
+      })
+      .catch(() => {});
   }, [id]);
 
   // When selected version changes, update versionData and load its files
@@ -87,6 +108,63 @@ function SoftwareDetails() {
     } finally {
       setDownloading(null);
     }
+  };
+
+  const handleSubmitRating = () => {
+    setRatingLoading(true);
+    setRatingError(null);
+    api.post(`/ratings/${id}`, { score: ratingForm.score, comment: ratingForm.comment || null })
+      .then(r => {
+        const newRating = { ...r.data, user: { id: getUser().id, username: getUser().username } };
+        setUserRating(newRating);
+        setRatings(prev => [newRating, ...prev]);
+        setAvgScore(prev => {
+          const total = ratings.length + 1;
+          return Math.round(((prev || 0) * ratings.length + ratingForm.score) / total * 10) / 10;
+        });
+      })
+      .catch(err => setRatingError(err.response?.data?.detail || 'Failed to submit rating'))
+      .finally(() => setRatingLoading(false));
+  };
+
+  const handleUpdateRating = () => {
+    setRatingLoading(true);
+    setRatingError(null);
+    api.patch(`/ratings/${id}`, { score: ratingForm.score, comment: ratingForm.comment || null })
+      .then(r => {
+        const updated = { ...r.data, user: { id: getUser().id, username: getUser().username } };
+        setUserRating(updated);
+        setRatings(prev => prev.map(rt => rt.id === updated.id ? updated : rt));
+        setAvgScore(prev => {
+          const others = ratings.filter(rt => rt.id !== updated.id);
+          const total = others.length + 1;
+          return Math.round((others.reduce((s, rt) => s + rt.score, 0) + ratingForm.score) / total * 10) / 10;
+        });
+        setEditMode(false);
+      })
+      .catch(err => setRatingError(err.response?.data?.detail || 'Failed to update rating'))
+      .finally(() => setRatingLoading(false));
+  };
+
+  const handleDeleteRating = () => {
+    setRatingLoading(true);
+    setRatingError(null);
+    api.delete(`/ratings/${id}`)
+      .then(() => {
+        setRatings(prev => {
+          const remaining = prev.filter(rt => rt.id !== userRating.id);
+          setAvgScore(remaining.length > 0
+            ? Math.round(remaining.reduce((s, rt) => s + rt.score, 0) / remaining.length * 10) / 10
+            : null
+          );
+          return remaining;
+        });
+        setUserRating(null);
+        setRatingForm({ score: 5, comment: '' });
+        setEditMode(false);
+      })
+      .catch(err => setRatingError(err.response?.data?.detail || 'Failed to delete rating'))
+      .finally(() => setRatingLoading(false));
   };
 
   const formatFileSize = (bytes) => {
@@ -271,9 +349,20 @@ function SoftwareDetails() {
         background: 'white', border: '1px solid #e0e0e0',
         borderRadius: '8px', padding: '40px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)'
       }}>
-        <h1 style={{ margin: '0 0 20px 0', fontSize: '36px', color: '#2d3436' }}>
-          {software?.title}
-        </h1>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px', marginBottom: '20px' }}>
+          <h1 style={{ margin: 0, fontSize: '36px', color: '#2d3436' }}>
+            {software?.title}
+          </h1>
+          {avgScore !== null && (
+            <div style={{ textAlign: 'right' }}>
+              <span style={{ fontSize: '28px', color: '#f39c12', fontWeight: '700' }}>★ {avgScore}</span>
+              <span style={{ fontSize: '14px', color: '#999', marginLeft: '6px' }}>/ 5 ({ratings.length} {ratings.length === 1 ? 'rating' : 'ratings'})</span>
+            </div>
+          )}
+          {avgScore === null && (
+            <span style={{ fontSize: '14px', color: '#bbb' }}>No ratings yet</span>
+          )}
+        </div>
 
         {/* Meta badges */}
         <div style={{ display: 'flex', gap: '12px', marginBottom: '30px', flexWrap: 'wrap' }}>
@@ -346,6 +435,199 @@ function SoftwareDetails() {
             </div>
           ))}
         </div>
+      </div>
+
+      {/* Ratings & Reviews */}
+      <div style={{
+        marginTop: '24px', background: 'white', border: '1px solid #e0e0e0',
+        borderRadius: '8px', padding: '30px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)'
+      }}>
+        <h2 style={{ margin: '0 0 20px 0', fontSize: '22px', color: '#2d3436' }}>Ratings & Reviews</h2>
+
+        {ratingError && (
+          <div style={{
+            marginBottom: '16px', padding: '12px 16px', background: '#f8d7da',
+            border: '1px solid #f5c6cb', borderRadius: '4px', color: '#721c24', fontSize: '14px'
+          }}>
+            {ratingError}
+          </div>
+        )}
+
+        {/* Submit / edit form */}
+        {isAuthenticated() && !userRating && (
+          <div style={{
+            marginBottom: '24px', padding: '20px', background: '#f8f9fa',
+            borderRadius: '6px', border: '1px solid #dee2e6'
+          }}>
+            <p style={{ margin: '0 0 12px 0', fontWeight: '600', color: '#2d3436' }}>Leave a Rating</p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
+              <label style={{ fontSize: '14px', color: '#636e72' }}>Score:</label>
+              <select
+                value={ratingForm.score}
+                onChange={e => setRatingForm(prev => ({ ...prev, score: parseInt(e.target.value) }))}
+                style={{ padding: '6px 10px', borderRadius: '4px', border: '1px solid #dee2e6', fontSize: '14px' }}
+              >
+                {[1, 2, 3, 4, 5].map(n => (
+                  <option key={n} value={n}>{'★'.repeat(n)} {n}</option>
+                ))}
+              </select>
+            </div>
+            <textarea
+              placeholder="Comment (optional)"
+              value={ratingForm.comment}
+              onChange={e => setRatingForm(prev => ({ ...prev, comment: e.target.value }))}
+              rows={3}
+              style={{
+                width: '100%', padding: '10px', borderRadius: '4px', border: '1px solid #dee2e6',
+                fontSize: '14px', resize: 'vertical', boxSizing: 'border-box', marginBottom: '12px'
+              }}
+            />
+            <button
+              onClick={handleSubmitRating}
+              disabled={ratingLoading}
+              style={{
+                padding: '10px 24px', background: '#4ecdc4', color: 'white', border: 'none',
+                borderRadius: '4px', cursor: ratingLoading ? 'not-allowed' : 'pointer',
+                fontWeight: '600', fontSize: '14px'
+              }}
+            >
+              {ratingLoading ? 'Submitting...' : 'Submit Rating'}
+            </button>
+          </div>
+        )}
+
+        {/* Own rating display */}
+        {isAuthenticated() && userRating && !editMode && (
+          <div style={{
+            marginBottom: '24px', padding: '16px 20px', background: '#e8f8f7',
+            borderRadius: '6px', border: '1px solid #b2dfdb'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+              <div>
+                <span style={{ fontWeight: '600', color: '#2d3436', marginRight: '10px' }}>Your Rating:</span>
+                <span style={{ color: '#f39c12', fontWeight: '700', fontSize: '18px' }}>{'★'.repeat(userRating.score)}</span>
+                <span style={{ color: '#ccc', fontWeight: '700', fontSize: '18px' }}>{'★'.repeat(5 - userRating.score)}</span>
+                {userRating.comment && (
+                  <p style={{ margin: '6px 0 0 0', fontSize: '14px', color: '#636e72' }}>{userRating.comment}</p>
+                )}
+              </div>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  onClick={() => { setRatingForm({ score: userRating.score, comment: userRating.comment || '' }); setEditMode(true); }}
+                  style={{
+                    padding: '6px 14px', background: '#ffc107', color: '#333', border: 'none',
+                    borderRadius: '4px', cursor: 'pointer', fontWeight: '600', fontSize: '13px'
+                  }}
+                >
+                  Edit
+                </button>
+                <button
+                  onClick={handleDeleteRating}
+                  disabled={ratingLoading}
+                  style={{
+                    padding: '6px 14px', background: '#ff6b6b', color: 'white', border: 'none',
+                    borderRadius: '4px', cursor: ratingLoading ? 'not-allowed' : 'pointer',
+                    fontWeight: '600', fontSize: '13px'
+                  }}
+                >
+                  {ratingLoading ? '...' : 'Delete'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Edit form */}
+        {isAuthenticated() && userRating && editMode && (
+          <div style={{
+            marginBottom: '24px', padding: '20px', background: '#f8f9fa',
+            borderRadius: '6px', border: '1px solid #dee2e6'
+          }}>
+            <p style={{ margin: '0 0 12px 0', fontWeight: '600', color: '#2d3436' }}>Edit Your Rating</p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
+              <label style={{ fontSize: '14px', color: '#636e72' }}>Score:</label>
+              <select
+                value={ratingForm.score}
+                onChange={e => setRatingForm(prev => ({ ...prev, score: parseInt(e.target.value) }))}
+                style={{ padding: '6px 10px', borderRadius: '4px', border: '1px solid #dee2e6', fontSize: '14px' }}
+              >
+                {[1, 2, 3, 4, 5].map(n => (
+                  <option key={n} value={n}>{'★'.repeat(n)} {n}</option>
+                ))}
+              </select>
+            </div>
+            <textarea
+              placeholder="Comment (optional)"
+              value={ratingForm.comment}
+              onChange={e => setRatingForm(prev => ({ ...prev, comment: e.target.value }))}
+              rows={3}
+              style={{
+                width: '100%', padding: '10px', borderRadius: '4px', border: '1px solid #dee2e6',
+                fontSize: '14px', resize: 'vertical', boxSizing: 'border-box', marginBottom: '12px'
+              }}
+            />
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button
+                onClick={handleUpdateRating}
+                disabled={ratingLoading}
+                style={{
+                  padding: '10px 24px', background: '#4ecdc4', color: 'white', border: 'none',
+                  borderRadius: '4px', cursor: ratingLoading ? 'not-allowed' : 'pointer',
+                  fontWeight: '600', fontSize: '14px'
+                }}
+              >
+                {ratingLoading ? 'Saving...' : 'Save Changes'}
+              </button>
+              <button
+                onClick={() => { setEditMode(false); setRatingError(null); }}
+                style={{
+                  padding: '10px 24px', background: 'transparent', color: '#636e72',
+                  border: '1px solid #dee2e6', borderRadius: '4px', cursor: 'pointer', fontSize: '14px'
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+
+        {!isAuthenticated() && (
+          <p style={{ fontSize: '14px', color: '#999', marginBottom: '20px' }}>
+            <span
+              onClick={() => navigate('/login')}
+              style={{ color: '#4ecdc4', cursor: 'pointer', fontWeight: '600' }}
+            >
+              Log in
+            </span>{' '}to leave a rating.
+          </p>
+        )}
+
+        {/* All reviews list */}
+        {ratings.length === 0 ? (
+          <p style={{ color: '#bbb', fontSize: '15px' }}>No reviews yet. Be the first!</p>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {ratings.map(r => (
+              <div key={r.id} style={{
+                padding: '16px 20px', border: '1px solid #e0e0e0',
+                borderRadius: '6px', background: '#fafafa'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: r.comment ? '8px' : 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <span style={{ fontWeight: '600', color: '#2d3436', fontSize: '14px' }}>{r.user.username}</span>
+                    <span style={{ color: '#f39c12', fontWeight: '700' }}>{'★'.repeat(r.score)}<span style={{ color: '#e0e0e0' }}>{'★'.repeat(5 - r.score)}</span></span>
+                  </div>
+                  <span style={{ fontSize: '12px', color: '#bbb' }}>
+                    {new Date(r.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
+                  </span>
+                </div>
+                {r.comment && (
+                  <p style={{ margin: 0, fontSize: '14px', color: '#636e72', lineHeight: '1.5' }}>{r.comment}</p>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

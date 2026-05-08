@@ -1,34 +1,25 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import SoftwareAdminCard from '../components/SoftwareAdminCard';
 
 function AdminPanel() {
-    const navigate = useNavigate();
-    
     const [software, setSoftware] = useState([]);
     const [statusFilter, setStatusFilter] = useState('pending');
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-    fetchSoftware();
-  }, [statusFilter]);
-
-    const fetchSoftware = () => {
         setLoading(true);
-        
         const params = statusFilter ? `?status_filter=${statusFilter}` : '';
-
         api.get(`/software${params}`)
-        .then(response => {
-            setSoftware(response.data);
-            setLoading(false);
-        })
-        .catch(err => {
-            console.error(err);
-            setLoading(false);
-        });
-    };
+            .then(response => {
+                setSoftware(response.data);
+                setLoading(false);
+            })
+            .catch(err => {
+                console.error(err);
+                setLoading(false);
+            });
+    }, [statusFilter]);
 
     const handleApprove = async (id) => {
       await api.patch(`/admin/software/${id}/approve`);

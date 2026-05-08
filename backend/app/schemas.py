@@ -51,9 +51,34 @@ class SoftwareResponse(BaseModel):
     status: str
     download_count: int
     created_at: datetime
-    
+
     developer: Optional[DeveloperInfo] = None
     category: Optional[CategoryInfo] = None
-    
+
+    class Config:
+        from_attributes = True
+
+
+class RatingUserInfo(BaseModel):
+    id: int
+    username: str
+
+class RatingCreate(BaseModel):
+    score: int
+    comment: Optional[str] = None
+
+class RatingUpdate(BaseModel):
+    score: Optional[int] = None
+    comment: Optional[str] = None
+
+class RatingResponse(BaseModel):
+    id: int
+    software_id: int
+    score: int
+    comment: Optional[str]
+    created_at: datetime
+    updated_at: datetime
+    user: RatingUserInfo
+
     class Config:
         from_attributes = True

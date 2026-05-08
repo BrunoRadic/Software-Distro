@@ -1,23 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getUser, logout } from '../utils/auth';
 import api from '../services/api';
 
 function Browse() {
-  const [user, setUser] = useState(null);
   const [software, setSoftware] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const navigate = useNavigate();
 
   useEffect(() => {
-    const userData = getUser();
-    // if (!userData) {
-    //   navigate('/login');
-    //   return;
-    // }
-    setUser(userData);
-
     api.get('/software/public')
       .then(response => {
         setSoftware(response.data);
@@ -28,18 +19,11 @@ function Browse() {
         setError('Failed to load software');
         setLoading(false);
       });
-  }, [navigate]);
-
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
-  };
+  }, []);
 
   const handleSoftwareClick = (id) => {
     navigate(`/software/${id}`);
   };
-
-  // if (!user) return null;
 
   return (
     <div style={{ 
