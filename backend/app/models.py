@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, BigInteger, DateTime, ForeignKey, Float, Boolean
+from sqlalchemy import Column, Integer, String, Text, BigInteger, DateTime, ForeignKey, Float, Boolean, UniqueConstraint
 from sqlalchemy.orm import relationship
 from datetime import datetime, timezone
 from app.database import Base
@@ -17,6 +17,7 @@ class User(Base):
     uploaded_software = relationship("Software", back_populates="developer")
     downloads = relationship("Download", back_populates="user")
     favorites = relationship("Favorite", back_populates="user")
+    ratings = relationship("Rating", back_populates="user")
 
 
 class Category(Base):
@@ -60,6 +61,7 @@ class Software(Base):
     downloads = relationship("Download", back_populates="software")
     favorites = relationship("Favorite", back_populates="software")
     files = relationship("SoftwareFile", back_populates="software", cascade="all, delete-orphan")
+    ratings = relationship("Rating", back_populates="software")
     parent = relationship(
     "Software",
     remote_side=[id],
@@ -110,3 +112,20 @@ class Favorite(Base):
     # Relationships
     user = relationship("User", back_populates="favorites")
     software = relationship("Software", back_populates="favorites")
+
+
+class Rating(Base):
+    __tablename__ = "ratings"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    software_id = Column(Integer, ForeignKey("software.id"), nullable=False)
+    score = Column(Integer, nullable=False)  # 1-5
+    comment = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.now(timezone.utc))
+    updated_at = Column(DateTime, default=datetime.now(timezone.utc), onupdate=datetime.now(timezone.utc))
+
+    __table_args__ = (UniqueConstraint("user_id", "software_id", name="uq_user_software_rating"),)
+
+    user = relationship("User", back_populates="ratings")
+    software = relationship("Software", back_populates="ratings")
