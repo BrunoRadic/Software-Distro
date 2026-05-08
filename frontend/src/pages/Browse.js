@@ -183,7 +183,7 @@ function Browse() {
                     borderTop: '1px solid #f0f0f0'
                   }}>
                     <span style={{ fontSize: '13px', color: '#636e72' }}>
-                      ⬇ {app.download_count} downloads
+                      {app.download_count} downloads
                     </span>
                     <span style={{ 
                       fontSize: '12px',

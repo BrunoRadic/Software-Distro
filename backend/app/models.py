@@ -59,6 +59,7 @@ class Software(Base):
     category = relationship("Category", back_populates="software")
     downloads = relationship("Download", back_populates="software")
     favorites = relationship("Favorite", back_populates="software")
+    files = relationship("SoftwareFile", back_populates="software", cascade="all, delete-orphan")
     parent = relationship(
     "Software",
     remote_side=[id],
@@ -69,6 +70,20 @@ class Software(Base):
         "Software",
         back_populates="parent"
     )
+
+
+class SoftwareFile(Base):
+    __tablename__ = "software_files"
+
+    id = Column(Integer, primary_key=True, index=True)
+    software_id = Column(Integer, ForeignKey("software.id"), nullable=False)
+    platform = Column(String(20), nullable=False)  # Windows, Mac, Linux
+    file_path = Column(String(255), nullable=False)
+    file_size = Column(BigInteger)
+    original_filename = Column(String(255))
+    uploaded_at = Column(DateTime, default=datetime.now(timezone.utc))
+
+    software = relationship("Software", back_populates="files")
 
 
 class Download(Base):

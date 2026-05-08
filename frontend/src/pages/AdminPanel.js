@@ -31,45 +31,18 @@ function AdminPanel() {
     };
 
     const handleApprove = async (id) => {
-    if (!window.confirm('Approve this software?')) return;
-    
-    try {
       await api.patch(`/admin/software/${id}/approve`);
-      alert('Software approved!');
-      
-      setSoftware(software.filter(s => s.id !== id));
-    } catch (err) {
-      console.error('Approve error:', err);
-      alert('Error: ' + (err.response?.data?.detail || 'Failed to approve'));
-    }
+      setSoftware(prev => prev.filter(s => s.id !== id));
   };
 
-   const handleReject = async (id) => {
-    if (!window.confirm('Reject this software?')) return;
-    
-    try {
+  const handleReject = async (id) => {
       await api.patch(`/admin/software/${id}/reject`);
-      alert('Software rejected');
-      
-      setSoftware(software.filter(s => s.id !== id));
-    } catch (err) {
-      console.error('Reject error:', err);
-      alert('Error: ' + (err.response?.data?.detail || 'Failed to reject'));
-    }
+      setSoftware(prev => prev.filter(s => s.id !== id));
   };
 
-     const handleDelete = async (id) => {
-    if (!window.confirm('Permanently delete this software?\n\nThis action cannot be undone.')) return;
-    
-    try {
+  const handleDelete = async (id) => {
       await api.delete(`/admin/software/${id}`);
-      alert('Software deleted permanently');
-      
-      setSoftware(software.filter(s => s.id !== id));
-    } catch (err) {
-      console.error('Delete error:', err);
-      alert('Error: ' + (err.response?.data?.detail || 'Failed to delete'));
-    }
+      setSoftware(prev => prev.filter(s => s.id !== id));
   };
 
     return (

@@ -42,7 +42,7 @@ class SoftwareResponse(BaseModel):
     version: str
     developer_id: int
     category_id: int
-    file_size: int
+    file_size: Optional[int] = None
     os_compatibility: str
     license: Optional[str]
     price_type: Optional[str]
@@ -52,7 +52,6 @@ class SoftwareResponse(BaseModel):
     download_count: int
     created_at: datetime
     
-    # ✅ DODAJ OVO
     developer: Optional[DeveloperInfo] = None
     category: Optional[CategoryInfo] = None
     

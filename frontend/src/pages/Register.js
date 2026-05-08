@@ -48,7 +48,6 @@ function Register() {
         role: formData.role
       });
 
-      alert('✅ Registration successful! Please login.');
       navigate('/login');
     } catch (err) {
       console.error('Registration error:', err);
