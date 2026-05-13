@@ -51,7 +51,18 @@ function SoftwareDetails() {
       });
 
     api.get(`/software/${id}/versions`)
-      .then(r => setVersions(r.data))
+      .then(r => {
+        const sorted = [...r.data].sort((a, b) => {
+          const aParts = a.version.split('.').map(Number);
+          const bParts = b.version.split('.').map(Number);
+          for (let i = 0; i < Math.max(aParts.length, bParts.length); i++) {
+            const diff = (bParts[i] ?? 0) - (aParts[i] ?? 0);
+            if (diff !== 0) return diff;
+          }
+          return 0;
+        });
+        setVersions(sorted);
+      })
       .catch(err => console.error('Error fetching versions:', err));
 
     api.get(`/ratings/${id}`)
@@ -370,8 +381,8 @@ function SoftwareDetails() {
               <option key={v.id} value={v.id}>
                 v{v.version}
                 {v.is_latest && ' (Latest)'}
-                {v.platforms && v.platforms.length > 0 && ` — ${v.platforms.join(', ')}`}
-                {' — '}{new Date(v.created_at).toLocaleDateString()}
+                {v.platforms && v.platforms.length > 0 && ` - ${v.platforms.join(', ')}`}
+                {' - '}{new Date(v.created_at).toLocaleDateString()}
               </option>
             ))}
           </select>

@@ -366,11 +366,6 @@ async def upload_new_version(
 
     parent_id = original.parent_software_id if original.parent_software_id else original.id
 
-    db.query(models.Software).filter(
-        (models.Software.id == parent_id) |
-        (models.Software.parent_software_id == parent_id)
-    ).update({"is_latest_version": False})
-
     new_version = models.Software(
         title=original.title,
         description=description,
@@ -385,7 +380,7 @@ async def upload_new_version(
         price=original.price,
         external_link=original.external_link,
         parent_software_id=parent_id,
-        is_latest_version=True,
+        is_latest_version=False,
         status="pending"
     )
     db.add(new_version)

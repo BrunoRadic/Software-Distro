@@ -22,8 +22,16 @@ def approve_software(
         raise HTTPException(status_code=404, detail="Software not found")
     
     software.status = "approved"
+
+    parent_id = software.parent_software_id if software.parent_software_id else software.id
+    db.query(models.Software).filter(
+        (models.Software.id == parent_id) |
+        (models.Software.parent_software_id == parent_id)
+    ).update({"is_latest_version": False})
+    software.is_latest_version = True
+
     db.commit()
-    
+
     return {"message": f"Software '{software.title}' approved"}
 
 
