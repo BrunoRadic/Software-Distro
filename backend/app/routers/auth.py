@@ -76,3 +76,38 @@ def login(credentials: schemas.UserLogin, db: Session = Depends(get_db)):
 def get_me(current_user: models.User = Depends(get_current_user)):
     """Dohvati podatke trenutno logiranog korisnika"""
     return current_user
+
+
+@router.get("/me/downloads")
+def get_my_downloads(
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    downloads = (
+        db.query(models.Download)
+        .filter(models.Download.user_id == current_user.id)
+        .order_by(models.Download.downloaded_at.desc())
+        .all()
+    )
+
+    result = []
+    for d in downloads:
+        sf = d.software_file
+        versioned_sw = sf.software if sf else d.software
+        if not versioned_sw:
+            continue
+        platform = sf.platform if sf else None
+        category = versioned_sw.category
+        result.append({
+            "id": d.id,
+            "downloaded_at": d.downloaded_at,
+            "platform": platform,
+            "software": {
+                "id": versioned_sw.id,
+                "title": versioned_sw.title,
+                "version": versioned_sw.version,
+                "category": category.name if category else None,
+            },
+        })
+
+    return result

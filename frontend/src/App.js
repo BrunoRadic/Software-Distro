@@ -10,6 +10,7 @@ import AdminPanel from './pages/AdminPanel';
 import Register from './pages/Register';
 import UploadVersion from './pages/UploadVersion';
 import Favorites from './pages/Favorites';
+import DownloadHistory from './pages/DownloadHistory';
 
 function App() {
   return (
@@ -25,6 +26,14 @@ function App() {
           element={
             <ProtectedRoute>
               <Favorites />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/downloads"
+          element={
+            <ProtectedRoute>
+              <DownloadHistory />
             </ProtectedRoute>
           }
         />

@@ -276,7 +276,12 @@ async def download_software(
     if not download_url:
         raise HTTPException(status_code=500, detail="Download URL generation failed")
 
-    download_record = models.Download(software_id=software_id, user_id=current_user.id)
+    software_file_id = sw_file.id if sw_files else None
+    download_record = models.Download(
+        software_id=software_id,
+        user_id=current_user.id,
+        software_file_id=software_file_id,
+    )
     db.add(download_record)
     software.download_count += 1
     db.commit()

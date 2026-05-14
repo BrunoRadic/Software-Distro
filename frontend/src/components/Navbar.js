@@ -52,6 +52,13 @@ function Navbar() {
           Favorites
         </button>
 
+        <button
+          onClick={() => navigate('/downloads')}
+          style={linkButtonStyle}
+        >
+          Downloads
+        </button>
+
         {/* Upload - samo za developer/admin */}
         {(user.role === 'developer' || user.role === 'admin') && (
           <button 

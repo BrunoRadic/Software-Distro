@@ -90,15 +90,17 @@ class SoftwareFile(Base):
 
 class Download(Base):
     __tablename__ = "downloads"
-    
+
     id = Column(Integer, primary_key=True, index=True)
     software_id = Column(Integer, ForeignKey("software.id"))
     user_id = Column(Integer, ForeignKey("users.id"))
+    software_file_id = Column(Integer, ForeignKey("software_files.id"), nullable=True)
     downloaded_at = Column(DateTime, default=datetime.now(timezone.utc))
-    
+
     # Relationships
     software = relationship("Software", back_populates="downloads")
     user = relationship("User", back_populates="downloads")
+    software_file = relationship("SoftwareFile")
 
 
 class Favorite(Base):
