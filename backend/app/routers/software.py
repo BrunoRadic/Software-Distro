@@ -194,6 +194,43 @@ def list_software_authenticated(
     return result
 
 
+@router.get("/my-uploads")
+def get_my_uploads(
+    current_user: models.User = Depends(require_developer),
+    db: Session = Depends(get_db)
+):
+    """All software uploaded by the current developer, all statuses, with download_count and avg rating."""
+    software_list = db.query(models.Software).filter(
+        models.Software.developer_id == current_user.id
+    ).order_by(models.Software.created_at.desc()).all()
+
+    result = []
+    for sw in software_list:
+        ratings = db.query(models.Rating).filter(models.Rating.software_id == sw.id).all()
+        avg_rating = round(sum(r.score for r in ratings) / len(ratings), 2) if ratings else None
+
+        result.append({
+            "id": sw.id,
+            "title": sw.title,
+            "description": sw.description,
+            "version": sw.version,
+            "status": sw.status,
+            "download_count": sw.download_count,
+            "average_rating": avg_rating,
+            "rating_count": len(ratings),
+            "os_compatibility": sw.os_compatibility,
+            "license": sw.license,
+            "price_type": sw.price_type,
+            "price": sw.price,
+            "external_link": sw.external_link,
+            "created_at": sw.created_at,
+            "is_latest_version": sw.is_latest_version,
+            "parent_software_id": sw.parent_software_id,
+        })
+
+    return result
+
+
 @router.get("/{software_id}/files")
 def get_software_files(
     software_id: int,
@@ -331,6 +368,41 @@ async def get_software(
             "name": category.name
         } if category else None
     }
+
+
+@router.delete("/{software_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_software(
+    software_id: int,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Delete software and its files. Owner or admin only."""
+    software = db.query(models.Software).filter(models.Software.id == software_id).first()
+    if not software:
+        raise HTTPException(status_code=404, detail="Software not found")
+
+    if software.developer_id != current_user.id and current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Not authorized to delete this software")
+
+    sw_files = db.query(models.SoftwareFile).filter(
+        models.SoftwareFile.software_id == software_id
+    ).all()
+    for f in sw_files:
+        storage.delete_file_from_storage(f.file_path)
+    if software.file_path:
+        storage.delete_file_from_storage(software.file_path)
+
+    db.query(models.Rating).filter(models.Rating.software_id == software_id).delete()
+    db.query(models.Favorite).filter(models.Favorite.software_id == software_id).delete()
+    db.query(models.Download).filter(models.Download.software_id == software_id).delete()
+
+    # Detach child versions to avoid FK constraint on self-referential relationship
+    db.query(models.Software).filter(
+        models.Software.parent_software_id == software_id
+    ).update({"parent_software_id": None})
+
+    db.delete(software)
+    db.commit()
 
 
 @router.post("/{software_id}/upload-version", status_code=status.HTTP_201_CREATED)
