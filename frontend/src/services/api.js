@@ -25,5 +25,6 @@ api.interceptors.request.use(
 
 export const getMyUploads = () => api.get('/software/my-uploads');
 export const deleteSoftware = (id) => api.delete(`/software/${id}`);
+export const getSoftwareStats = (id) => api.get(`/software/${id}/stats`);
 
 export default api;
