@@ -11,6 +11,7 @@ import Register from './pages/Register';
 import UploadVersion from './pages/UploadVersion';
 import Favorites from './pages/Favorites';
 import DownloadHistory from './pages/DownloadHistory';
+import DeveloperDashboard from './pages/DeveloperDashboard';
 
 function App() {
   return (
@@ -38,8 +39,16 @@ function App() {
           }
         />
         <Route path="/software/:id" element={<SoftwareDetails />} />
-        <Route 
-          path="/upload" 
+        <Route
+          path="/developer-dashboard"
+          element={
+            <ProtectedRoute requiredRole="developer">
+              <DeveloperDashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/upload"
           element={
             <ProtectedRoute requiredRole="developer">
               <UploadSoftware />

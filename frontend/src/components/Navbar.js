@@ -59,9 +59,19 @@ function Navbar() {
           Downloads
         </button>
 
+        {/* Developer Dashboard - samo za developer */}
+        {user.role === 'developer' && (
+          <button
+            onClick={() => navigate('/developer-dashboard')}
+            style={linkButtonStyle}
+          >
+            My Uploads
+          </button>
+        )}
+
         {/* Upload - samo za developer/admin */}
         {(user.role === 'developer' || user.role === 'admin') && (
-          <button 
+          <button
             onClick={() => navigate('/upload')}
             style={linkButtonStyle}
           >

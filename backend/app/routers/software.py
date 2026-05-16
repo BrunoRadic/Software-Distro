@@ -396,7 +396,6 @@ def delete_software(
     db.query(models.Favorite).filter(models.Favorite.software_id == software_id).delete()
     db.query(models.Download).filter(models.Download.software_id == software_id).delete()
 
-    # Detach child versions to avoid FK constraint on self-referential relationship
     db.query(models.Software).filter(
         models.Software.parent_software_id == software_id
     ).update({"parent_software_id": None})
