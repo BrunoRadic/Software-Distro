@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import Optional, List
 
 from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile, Form
+from sqlalchemy import func, cast, Date
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -523,3 +524,29 @@ def get_software_versions(
         })
 
     return result
+
+
+@router.get("/{software_id}/stats")
+def get_software_stats(
+    software_id: int,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Download counts grouped by date for a specific software. Owner or admin only."""
+    software = db.query(models.Software).filter(models.Software.id == software_id).first()
+    if not software:
+        raise HTTPException(status_code=404, detail="Software not found")
+
+    if software.developer_id != current_user.id and current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Not authorized to view stats for this software")
+
+    date_col = cast(models.Download.downloaded_at, Date)
+    rows = (
+        db.query(date_col.label("date"), func.count().label("count"))
+        .filter(models.Download.software_id == software_id)
+        .group_by(date_col)
+        .order_by(date_col)
+        .all()
+    )
+
+    return [{"date": str(row.date), "count": row.count} for row in rows]
