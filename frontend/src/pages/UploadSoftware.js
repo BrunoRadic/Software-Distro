@@ -230,8 +230,16 @@ function UploadSoftware() {
         {/* License */}
         <div style={{ marginBottom: '20px' }}>
           <label style={labelStyle}>License <span style={{ color: '#ff6b6b' }}>*</span></label>
-          <input type="text" name="license" value={formData.license} onChange={handleChange}
-            required placeholder="e.g., MIT, GPL, Proprietary" style={inputStyle} />
+          <select name="license" value={formData.license} onChange={handleChange}
+            required style={inputStyle}>
+            <option value="">Select license...</option>
+            <option value="MIT">MIT</option>
+            <option value="Apache 2.0">Apache 2.0</option>
+            <option value="GPL v3">GPL v3</option>
+            <option value="BSD 2-Clause">BSD 2-Clause</option>
+            <option value="Proprietary / Commercial">Proprietary / Commercial</option>
+            <option value="Freeware">Freeware</option>
+          </select>
         </div>
 
         {/* Price Type & Price */}
