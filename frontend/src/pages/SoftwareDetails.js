@@ -5,6 +5,7 @@ import { isAuthenticated, getUser } from '../utils/auth';
 
 function SoftwareDetails() {
   const { id } = useParams();
+  const favoriteSoftwareId = Number(id);
   const navigate = useNavigate();
 
   const [software, setSoftware] = useState(null);
@@ -79,7 +80,7 @@ function SoftwareDetails() {
       .catch(() => {});
 
     if (isAuthenticated()) {
-      api.get(`/favorites/${id}/status`)
+      api.get(`/favorites/${favoriteSoftwareId}/status`)
         .then(r => setIsFavorited(r.data.is_favorited))
         .catch(() => {});
     }
@@ -192,10 +193,10 @@ function SoftwareDetails() {
     setFavLoading(true);
     try {
       if (isFavorited) {
-        await api.delete(`/favorites/${id}`);
+        await api.delete(`/favorites/${favoriteSoftwareId}`);
         setIsFavorited(false);
       } else {
-        await api.post(`/favorites/${id}`);
+        await api.post(`/favorites/${favoriteSoftwareId}`);
         setIsFavorited(true);
       }
     } catch (err) {

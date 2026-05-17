@@ -11,7 +11,13 @@ function Favorites() {
   useEffect(() => {
     api.get('/favorites')
       .then(response => {
-        setFavorites(response.data);
+        const seen = new Set();
+        const unique = response.data.filter(app => {
+          if (seen.has(app.id)) return false;
+          seen.add(app.id);
+          return true;
+        });
+        setFavorites(unique);
         setLoading(false);
       })
       .catch(err => {
@@ -132,30 +138,12 @@ function Favorites() {
                     {app.description || 'No description available'}
                   </p>
 
-                  <div style={{ display: 'flex', gap: '15px', marginBottom: '12px', flexWrap: 'wrap' }}>
-                    <span style={{
-                      fontSize: '13px', color: '#636e72', background: '#f8f9fa',
-                      padding: '4px 8px', borderRadius: '4px'
-                    }}>
-                      v{app.version}
-                    </span>
+                  <div style={{ display: 'flex', gap: '15px', flexWrap: 'wrap' }}>
                     <span style={{
                       fontSize: '13px', color: '#636e72', background: '#f8f9fa',
                       padding: '4px 8px', borderRadius: '4px'
                     }}>
                       {app.os_compatibility || 'N/A'}
-                    </span>
-                  </div>
-
-                  <div style={{
-                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                    paddingTop: '12px', borderTop: '1px solid #f0f0f0'
-                  }}>
-                    <span style={{ fontSize: '13px', color: '#636e72' }}>
-                      {app.download_count} downloads
-                    </span>
-                    <span style={{ fontSize: '12px', color: '#4ecdc4', fontWeight: '600' }}>
-                      View Details →
                     </span>
                   </div>
                 </div>
