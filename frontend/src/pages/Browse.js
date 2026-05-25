@@ -20,7 +20,6 @@ function Browse() {
   useEffect(() => {
     setLoading(true);
     const params = {};
-    if (search) params.search = search;
     if (categoryId) params.category_id = categoryId;
     api.get('/software/public', { params })
       .then(response => {
@@ -32,11 +31,15 @@ function Browse() {
         setError('Failed to load software');
         setLoading(false);
       });
-  }, [search, categoryId]);
+  }, [categoryId]);
 
   const handleSoftwareClick = (id) => {
     navigate(`/software/${id}`);
   };
+
+  const filtered = search
+    ? software.filter(app => app.title.toLowerCase().includes(search.toLowerCase()))
+    : software;
 
   return (
     <div style={{ 
@@ -116,7 +119,7 @@ function Browse() {
       {/* Software Grid */}
       {!loading && !error && (
         <>
-          {software.length === 0 ? (
+          {filtered.length === 0 ? (
             <div style={{ 
               textAlign: 'center', 
               padding: '60px 20px',
@@ -133,7 +136,7 @@ function Browse() {
               gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
               gap: '20px'
             }}>
-              {software.map((app) => (
+              {filtered.map((app) => (
                 <div 
                   key={app.id}
                   onClick={() => handleSoftwareClick(app.id)}
