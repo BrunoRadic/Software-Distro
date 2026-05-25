@@ -6,10 +6,23 @@ function Browse() {
   const [software, setSoftware] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [search, setSearch] = useState('');
+  const [categories, setCategories] = useState([]);
+  const [categoryId, setCategoryId] = useState('');
   const navigate = useNavigate();
 
   useEffect(() => {
-    api.get('/software/public')
+    api.get('/categories')
+      .then(response => setCategories(response.data))
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    setLoading(true);
+    const params = {};
+    if (search) params.search = search;
+    if (categoryId) params.category_id = categoryId;
+    api.get('/software/public', { params })
       .then(response => {
         setSoftware(response.data);
         setLoading(false);
@@ -19,7 +32,7 @@ function Browse() {
         setError('Failed to load software');
         setLoading(false);
       });
-  }, []);
+  }, [search, categoryId]);
 
   const handleSoftwareClick = (id) => {
     navigate(`/software/${id}`);
@@ -41,6 +54,43 @@ function Browse() {
         borderBottom: '2px solid #e0e0e0'
       }}>
         <h1 style={{ margin: 0, fontSize: '28px' }}>Browse Software</h1>
+      </div>
+
+      {/* Search and Filter */}
+      <div style={{ display: 'flex', gap: '12px', marginBottom: '24px', flexWrap: 'wrap' }}>
+        <input
+          type="text"
+          placeholder="Search software..."
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          style={{
+            flex: '1',
+            minWidth: '200px',
+            padding: '10px 14px',
+            fontSize: '15px',
+            border: '1px solid #e0e0e0',
+            borderRadius: '6px',
+            outline: 'none'
+          }}
+        />
+        <select
+          value={categoryId}
+          onChange={e => setCategoryId(e.target.value)}
+          style={{
+            padding: '10px 14px',
+            fontSize: '15px',
+            border: '1px solid #e0e0e0',
+            borderRadius: '6px',
+            background: 'white',
+            cursor: 'pointer',
+            minWidth: '160px'
+          }}
+        >
+          <option value="">All Categories</option>
+          {categories.map(cat => (
+            <option key={cat.id} value={cat.id}>{cat.name}</option>
+          ))}
+        </select>
       </div>
 
       {/* Loading State */}
