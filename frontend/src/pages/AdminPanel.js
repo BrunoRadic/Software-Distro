@@ -245,10 +245,86 @@ function CategoriesTab() {
   );
 }
 
+const ROLE_BADGE = {
+  admin:     { background: '#6c5ce7', color: 'white' },
+  developer: { background: '#0984e3', color: 'white' },
+  user:      { background: '#b2bec3', color: '#2d3436' },
+};
+
 function UsersTab() {
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    api.get('/admin/users')
+      .then(r => { setUsers(r.data); setLoading(false); })
+      .catch(err => { console.error(err); setLoading(false); });
+  }, []);
+
+  if (loading) return <div style={{ padding: '40px 0', color: '#999' }}>Loading users...</div>;
+
+  const thStyle = {
+    padding: '12px 16px',
+    textAlign: 'left',
+    fontSize: '13px',
+    fontWeight: '600',
+    color: '#636e72',
+    textTransform: 'uppercase',
+    letterSpacing: '0.05em',
+    borderBottom: '2px solid #e0e0e0',
+    background: '#f8f9fa',
+  };
+
+  const tdStyle = {
+    padding: '12px 16px',
+    fontSize: '14px',
+    color: '#2d3436',
+    borderBottom: '1px solid #e0e0e0',
+  };
+
   return (
-    <div style={{ padding: '40px 0', color: '#999', fontSize: '16px' }}>
-      User management — coming soon.
+    <div>
+      <h2 style={{ fontSize: '20px', color: '#2d3436', marginBottom: '20px' }}>
+        Users <span style={{ fontSize: '14px', fontWeight: '400', color: '#636e72' }}>({users.length})</span>
+      </h2>
+      {users.length === 0 ? (
+        <p style={{ color: '#999', fontSize: '14px' }}>No users found.</p>
+      ) : (
+        <div style={{ border: '1px solid #e0e0e0', borderRadius: '8px', overflow: 'hidden' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr>
+                <th style={thStyle}>Username</th>
+                <th style={thStyle}>Email</th>
+                <th style={thStyle}>Role</th>
+                <th style={thStyle}>Joined</th>
+              </tr>
+            </thead>
+            <tbody>
+              {users.map(u => (
+                <tr key={u.id}>
+                  <td style={tdStyle}><strong>{u.username}</strong></td>
+                  <td style={tdStyle}>{u.email}</td>
+                  <td style={tdStyle}>
+                    <span style={{
+                      ...ROLE_BADGE[u.role] || ROLE_BADGE.user,
+                      padding: '3px 10px',
+                      borderRadius: '12px',
+                      fontSize: '12px',
+                      fontWeight: '600',
+                    }}>
+                      {u.role}
+                    </span>
+                  </td>
+                  <td style={{ ...tdStyle, color: '#636e72' }}>
+                    {new Date(u.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }

@@ -70,6 +70,24 @@ def delete_category(
     db.commit()
     return {"message": f"Category '{category.name}' deleted"}
 
+@router.get("/users")
+def list_users(
+    admin: models.User = Depends(require_admin),
+    db: Session = Depends(get_db)
+):
+    users = db.query(models.User).order_by(models.User.created_at.desc()).all()
+    return [
+        {
+            "id": u.id,
+            "username": u.username,
+            "email": u.email,
+            "role": u.role,
+            "created_at": u.created_at,
+        }
+        for u in users
+    ]
+
+
 @router.patch("/software/{software_id}/approve")
 def approve_software(
     software_id: int,
