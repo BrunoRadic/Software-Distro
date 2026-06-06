@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../services/api';
 import SoftwareAdminCard from '../components/SoftwareAdminCard';
+import { getUser } from '../utils/auth';
 
 const TAB_STYLE = (active) => ({
   padding: '10px 24px',
@@ -254,6 +255,7 @@ const ROLE_BADGE = {
 function UsersTab() {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const currentUser = getUser();
 
   useEffect(() => {
     api.get('/admin/users')
@@ -327,21 +329,23 @@ function UsersTab() {
                     {new Date(u.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
                   </td>
                   <td style={tdStyle}>
-                    <button
-                      onClick={() => handleDelete(u)}
-                      style={{
-                        padding: '5px 12px',
-                        fontSize: '13px',
-                        background: '#d63031',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '4px',
-                        cursor: 'pointer',
-                        fontWeight: '500',
-                      }}
-                    >
-                      Delete
-                    </button>
+                    {u.id !== currentUser?.id && (
+                      <button
+                        onClick={() => handleDelete(u)}
+                        style={{
+                          padding: '5px 12px',
+                          fontSize: '13px',
+                          background: '#d63031',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                          fontWeight: '500',
+                        }}
+                      >
+                        Delete
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
