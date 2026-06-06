@@ -1,6 +1,7 @@
 import os
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from sqlalchemy import func, case
 from pydantic import BaseModel
 
 from app.database import get_db
@@ -70,6 +71,49 @@ def delete_category(
     db.commit()
     return {"message": f"Category '{category.name}' deleted"}
 
+@router.get("/stats")
+def get_stats(
+    admin: models.User = Depends(require_admin),
+    db: Session = Depends(get_db)
+):
+    total_users = db.query(models.User).count()
+    total_software = (
+        db.query(models.Software)
+        .filter(models.Software.status == "approved", models.Software.parent_software_id == None)
+        .count()
+    )
+    total_downloads = db.query(models.Download).count()
+
+    root_id_expr = case(
+        (models.Software.parent_software_id == None, models.Software.id),
+        else_=models.Software.parent_software_id
+    )
+    downloads_subq = (
+        db.query(
+            root_id_expr.label("root_id"),
+            func.sum(models.Software.download_count).label("total_downloads"),
+        )
+        .filter(models.Software.status == "approved")
+        .group_by(root_id_expr)
+        .subquery()
+    )
+    top_software = (
+        db.query(models.Software.title, downloads_subq.c.total_downloads)
+        .join(downloads_subq, models.Software.id == downloads_subq.c.root_id)
+        .filter(models.Software.parent_software_id == None)
+        .order_by(downloads_subq.c.total_downloads.desc())
+        .limit(10)
+        .all()
+    )
+
+    return {
+        "total_users": total_users,
+        "total_software": total_software,
+        "total_downloads": total_downloads,
+        "top_software": [{"title": row.title, "download_count": row.total_downloads} for row in top_software],
+    }
+
+
 @router.get("/users")
 def list_users(
     admin: models.User = Depends(require_admin),
@@ -86,6 +130,22 @@ def list_users(
         }
         for u in users
     ]
+
+
+@router.delete("/users/{user_id}")
+def delete_user(
+    user_id: int,
+    admin: models.User = Depends(require_admin),
+    db: Session = Depends(get_db)
+):
+    if admin.id == user_id:
+        raise HTTPException(status_code=400, detail="You cannot delete your own account.")
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    db.delete(user)
+    db.commit()
+    return {"message": f"User '{user.username}' deleted"}
 
 
 @router.patch("/software/{software_id}/approve")

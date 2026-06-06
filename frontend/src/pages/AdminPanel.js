@@ -44,7 +44,7 @@ function SoftwareTab() {
   };
 
   const handleDelete = async (id) => {
-    await api.delete(`/admin/software/${id}`);
+    await api.delete(`/software/${id}`);
     setSoftware(prev => prev.filter(s => s.id !== id));
   };
 
@@ -261,6 +261,12 @@ function UsersTab() {
       .catch(err => { console.error(err); setLoading(false); });
   }, []);
 
+  const handleDelete = async (user) => {
+    if (!window.confirm(`Delete user "${user.username}"? This cannot be undone.`)) return;
+    await api.delete(`/admin/users/${user.id}`);
+    setUsers(prev => prev.filter(u => u.id !== user.id));
+  };
+
   if (loading) return <div style={{ padding: '40px 0', color: '#999' }}>Loading users...</div>;
 
   const thStyle = {
@@ -285,7 +291,7 @@ function UsersTab() {
   return (
     <div>
       <h2 style={{ fontSize: '20px', color: '#2d3436', marginBottom: '20px' }}>
-        Users <span style={{ fontSize: '14px', fontWeight: '400', color: '#636e72' }}>({users.length})</span>
+        Users <span style={{ fontSize: '14px', fontWeight: '400', color: '#636e72' }}></span>
       </h2>
       {users.length === 0 ? (
         <p style={{ color: '#999', fontSize: '14px' }}>No users found.</p>
@@ -298,6 +304,7 @@ function UsersTab() {
                 <th style={thStyle}>Email</th>
                 <th style={thStyle}>Role</th>
                 <th style={thStyle}>Joined</th>
+                <th style={{ ...thStyle, width: '80px' }}></th>
               </tr>
             </thead>
             <tbody>
@@ -319,6 +326,23 @@ function UsersTab() {
                   <td style={{ ...tdStyle, color: '#636e72' }}>
                     {new Date(u.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
                   </td>
+                  <td style={tdStyle}>
+                    <button
+                      onClick={() => handleDelete(u)}
+                      style={{
+                        padding: '5px 12px',
+                        fontSize: '13px',
+                        background: '#d63031',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '4px',
+                        cursor: 'pointer',
+                        fontWeight: '500',
+                      }}
+                    >
+                      Delete
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -330,9 +354,84 @@ function UsersTab() {
 }
 
 function StatisticsTab() {
+  const [stats, setStats] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    api.get('/admin/stats')
+      .then(r => { setStats(r.data); setLoading(false); })
+      .catch(err => { console.error(err); setLoading(false); });
+  }, []);
+
+  if (loading) return <div style={{ padding: '40px 0', color: '#999' }}>Loading statistics...</div>;
+  if (!stats) return <div style={{ padding: '40px 0', color: '#999' }}>Failed to load statistics.</div>;
+
+  const cards = [
+    { label: 'Total Users',     value: stats.total_users,     color: '#6c5ce7' },
+    { label: 'Total Software',  value: stats.total_software,  color: '#0984e3' },
+    { label: 'Total Downloads', value: stats.total_downloads, color: '#00b894' },
+  ];
+
   return (
-    <div style={{ padding: '40px 0', color: '#999', fontSize: '16px' }}>
-      Statistics — coming soon.
+    <div>
+      <h2 style={{ fontSize: '20px', color: '#2d3436', marginBottom: '24px' }}>Statistics</h2>
+
+      {/* Summary cards */}
+      <div style={{ display: 'flex', gap: '20px', marginBottom: '36px', flexWrap: 'wrap' }}>
+        {cards.map(card => (
+          <div key={card.label} style={{
+            flex: '1 1 160px',
+            background: card.color,
+            borderRadius: '10px',
+            padding: '24px 28px',
+            color: 'white',
+          }}>
+            <div style={{ fontSize: '36px', fontWeight: '700', lineHeight: 1 }}>{card.value.toLocaleString()}</div>
+            <div style={{ fontSize: '14px', marginTop: '8px', opacity: 0.85 }}>{card.label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Top 10 */}
+      <h3 style={{ fontSize: '16px', fontWeight: '600', color: '#2d3436', marginBottom: '16px' }}>
+        Top 10 Most Downloaded
+      </h3>
+      {stats.top_software.length === 0 ? (
+        <p style={{ color: '#999', fontSize: '14px' }}>No downloads yet.</p>
+      ) : (
+        <div style={{ border: '1px solid #e0e0e0', borderRadius: '8px', overflow: 'hidden' }}>
+          {stats.top_software.map((sw, idx) => (
+            <div key={idx} style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '16px',
+              padding: '12px 16px',
+              background: idx % 2 === 0 ? '#fff' : '#f8f9fa',
+              borderBottom: idx < stats.top_software.length - 1 ? '1px solid #e0e0e0' : 'none',
+            }}>
+              <span style={{
+                width: '28px',
+                height: '28px',
+                borderRadius: '50%',
+                background: idx === 0 ? '#f9ca24' : idx === 1 ? '#b2bec3' : idx === 2 ? '#e17055' : '#dfe6e9',
+                color: idx < 3 ? 'white' : '#636e72',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '13px',
+                fontWeight: '700',
+                flexShrink: 0,
+              }}>
+                {idx + 1}
+              </span>
+              <span style={{ flex: 1, fontSize: '15px', color: '#2d3436' }}>{sw.title}</span>
+              <span style={{ fontSize: '14px', color: '#636e72', fontWeight: '600' }}>
+                {sw.download_count.toLocaleString()} {sw.download_count === 1 ? 'download' : 'downloads'}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
