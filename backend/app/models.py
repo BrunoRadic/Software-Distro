@@ -39,7 +39,7 @@ class Software(Base):
     description = Column(Text)
     version = Column(String(20))
     developer_id = Column(Integer, ForeignKey("users.id"))
-    category_id = Column(Integer, ForeignKey("categories.id"))
+    category_id = Column(Integer, ForeignKey("categories.id", ondelete="SET NULL"))
     file_path = Column(String(255))
     file_size = Column(BigInteger)
     os_compatibility = Column(String(50))  # Windows,Mac,Linux

@@ -1,12 +1,74 @@
 import os
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
- 
+from pydantic import BaseModel
+
 from app.database import get_db
 from app import models
 from app.dependencies import require_admin
- 
+
 router = APIRouter(prefix="/admin", tags=["admin"])
+
+
+class CategoryCreate(BaseModel):
+    name: str
+
+
+class CategoryUpdate(BaseModel):
+    name: str
+
+
+@router.post("/categories")
+def create_category(
+    body: CategoryCreate,
+    admin: models.User = Depends(require_admin),
+    db: Session = Depends(get_db)
+):
+    name = body.name.strip()
+    if not name:
+        raise HTTPException(status_code=422, detail="Name cannot be empty")
+    slug = name.lower().replace(" ", "-")
+    if db.query(models.Category).filter(models.Category.slug == slug).first():
+        raise HTTPException(status_code=409, detail="Category already exists")
+    category = models.Category(name=name, slug=slug)
+    db.add(category)
+    db.commit()
+    db.refresh(category)
+    return {"id": category.id, "name": category.name, "slug": category.slug}
+
+
+@router.patch("/categories/{category_id}")
+def update_category(
+    category_id: int,
+    body: CategoryUpdate,
+    admin: models.User = Depends(require_admin),
+    db: Session = Depends(get_db)
+):
+    category = db.query(models.Category).filter(models.Category.id == category_id).first()
+    if not category:
+        raise HTTPException(status_code=404, detail="Category not found")
+    name = body.name.strip()
+    if not name:
+        raise HTTPException(status_code=422, detail="Name cannot be empty")
+    category.name = name
+    category.slug = name.lower().replace(" ", "-")
+    db.commit()
+    db.refresh(category)
+    return {"id": category.id, "name": category.name, "slug": category.slug}
+
+
+@router.delete("/categories/{category_id}")
+def delete_category(
+    category_id: int,
+    admin: models.User = Depends(require_admin),
+    db: Session = Depends(get_db)
+):
+    category = db.query(models.Category).filter(models.Category.id == category_id).first()
+    if not category:
+        raise HTTPException(status_code=404, detail="Category not found")
+    db.delete(category)
+    db.commit()
+    return {"message": f"Category '{category.name}' deleted"}
 
 @router.patch("/software/{software_id}/approve")
 def approve_software(
