@@ -42,7 +42,6 @@ class SoftwareResponse(BaseModel):
     version: str
     developer_id: int
     category_id: int
-    file_size: Optional[int] = None
     os_compatibility: str
     license: Optional[str]
     price_type: Optional[str]

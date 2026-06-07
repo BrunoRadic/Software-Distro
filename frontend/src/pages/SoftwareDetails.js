@@ -14,7 +14,7 @@ function SoftwareDetails() {
   const [versions, setVersions] = useState([]);
   const [selectedVersion, setSelectedVersion] = useState(null);
   const [versionData, setVersionData] = useState({
-    version: '', file_size: 0, created_at: '', download_count: 0, description: '', platforms: []
+    version: '', created_at: '', download_count: 0, description: '', platforms: []
   });
   const [softwareFiles, setSoftwareFiles] = useState([]);
   const [downloading, setDownloading] = useState(null);  // platform string or 'legacy'
@@ -37,7 +37,6 @@ function SoftwareDetails() {
         setSoftware(response.data);
         setVersionData({
           version: response.data.version,
-          file_size: response.data.file_size,
           created_at: response.data.created_at,
           download_count: response.data.download_count,
           description: response.data.description,

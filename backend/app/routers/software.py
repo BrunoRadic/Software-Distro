@@ -88,8 +88,6 @@ async def upload_software(
         version=version,
         developer_id=current_user.id,
         category_id=category_id,
-        file_size=None,
-        file_path=None,
         os_compatibility=os_compatibility,
         license=license,
         price_type=price_type,
@@ -173,7 +171,6 @@ def list_software_authenticated(
             "version": sw.version,
             "developer_id": sw.developer_id,
             "category_id": sw.category_id,
-            "file_size": sw.file_size,
             "os_compatibility": sw.os_compatibility,
             "license": sw.license,
             "price_type": sw.price_type,
@@ -288,39 +285,34 @@ async def download_software(
     if software.status != "approved" and software.developer_id != current_user.id:
         raise HTTPException(status_code=403, detail="Software not approved")
 
-    # Resolve file path: prefer SoftwareFile records, fall back to legacy file_path
     sw_files = db.query(models.SoftwareFile).filter(
         models.SoftwareFile.software_id == software.id
     ).all()
 
-    if sw_files:
-        if platform:
-            sw_file = next((f for f in sw_files if f.platform == platform), None)
-            if not sw_file:
-                raise HTTPException(
-                    status_code=404,
-                    detail=f"No file available for {platform}. Available: {[f.platform for f in sw_files]}"
-                )
-        else:
-            sw_file = sw_files[0]
-        file_path = sw_file.file_path
-        original_filename = sw_file.original_filename or os.path.basename(sw_file.file_path)
+    if not sw_files:
+        raise HTTPException(status_code=404, detail="No downloadable file found")
+
+    if platform:
+        sw_file = next((f for f in sw_files if f.platform == platform), None)
+        if not sw_file:
+            raise HTTPException(
+                status_code=404,
+                detail=f"No file available for {platform}. Available: {[f.platform for f in sw_files]}"
+            )
     else:
-        # Legacy single-file fallback
-        if not software.file_path:
-            raise HTTPException(status_code=404, detail="No downloadable file found")
-        file_path = software.file_path
-        original_filename = os.path.basename(software.file_path)
+        sw_file = sw_files[0]
+
+    file_path = sw_file.file_path
+    original_filename = sw_file.original_filename or os.path.basename(sw_file.file_path)
 
     download_url = storage.generate_download_url(file_path)
     if not download_url:
         raise HTTPException(status_code=500, detail="Download URL generation failed")
 
-    software_file_id = sw_file.id if sw_files else None
     download_record = models.Download(
         software_id=software_id,
         user_id=current_user.id,
-        software_file_id=software_file_id,
+        software_file_id=sw_file.id,
     )
     db.add(download_record)
     software.download_count += 1
@@ -357,7 +349,6 @@ async def get_software(
         "license": software.license,
         "price_type": software.price_type,
         "price": software.price,
-        "file_size": software.file_size,
         "download_count": software.download_count,
         "status": software.status,
         "created_at": software.created_at,
@@ -392,8 +383,6 @@ def delete_software(
     ).all()
     for f in sw_files:
         storage.delete_file_from_storage(f.file_path)
-    if software.file_path:
-        storage.delete_file_from_storage(software.file_path)
 
     db.query(models.Rating).filter(models.Rating.software_id == software_id).delete()
     db.query(models.Favorite).filter(models.Favorite.software_id == software_id).delete()
@@ -502,8 +491,6 @@ async def upload_new_version(
         version=version,
         developer_id=original.developer_id,
         category_id=original.category_id,
-        file_path=None,
-        file_size=None,
         os_compatibility=original.os_compatibility,
         license=original.license,
         price_type=original.price_type,
@@ -562,7 +549,7 @@ def get_software_versions(
             models.SoftwareFile.software_id == v.id
         ).all()
 
-        total_size = sum(f.file_size for f in sw_files if f.file_size) or v.file_size
+        total_size = sum(f.file_size for f in sw_files if f.file_size)
         platforms = [f.platform for f in sw_files]
 
         result.append({

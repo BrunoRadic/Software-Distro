@@ -40,11 +40,9 @@ class Software(Base):
     version = Column(String(20))
     developer_id = Column(Integer, ForeignKey("users.id"))
     category_id = Column(Integer, ForeignKey("categories.id", ondelete="SET NULL"))
-    file_path = Column(String(255))
-    file_size = Column(BigInteger)
     os_compatibility = Column(String(50))  # Windows,Mac,Linux
     external_link = Column(String(255))
-    screenshot_url = Column(String(255))
+    screenshot_url = Column(String(255)) # neaktivno
     license = Column(String(50))
     price_type = Column(String(20))
     price = Column(Float)

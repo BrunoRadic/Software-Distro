@@ -1,4 +1,3 @@
-import os
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import func, case
@@ -192,27 +191,3 @@ def reject_software(
     db.commit()
     
     return {"message": f"Software '{software.title}' rejected"}
-
-
-@router.delete("/software/{software_id}")
-def delete_software(
-    software_id: int,
-    admin: models.User = Depends(require_admin),
-    db: Session = Depends(get_db)
-):
-    """Admin briše software"""
-    
-    software = db.query(models.Software).filter(models.Software.id == software_id).first()
-    
-    if not software:
-        raise HTTPException(status_code=404, detail="Software not found")
-    
-    # Obriši file sa diska
-    if os.path.exists(software.file_path):
-        os.remove(software.file_path)
-    
-    # Obriši iz baze
-    db.delete(software)
-    db.commit()
-    
-    return {"message": f"Software '{software.title}' deleted"}

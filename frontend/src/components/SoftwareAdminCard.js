@@ -60,7 +60,6 @@ function SoftwareAdminCard({ software, onApprove, onReject, onDelete }) {
           <div style={{ display: 'flex', gap: '15px', fontSize: '14px', color: '#636e72' }}>
             <span>v{software.version}</span>
             <span>{software.os_compatibility}</span>
-            <span>{formatFileSize(software.file_size)}</span>
           </div>
         </div>
         {getStatusBadge(software.status)}
