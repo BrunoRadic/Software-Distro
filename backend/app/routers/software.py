@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import Optional, List
 
 from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile, Form
+from pydantic import BaseModel
 from sqlalchemy import func, cast, Date
 from sqlalchemy.orm import Session
 
@@ -227,6 +228,7 @@ def get_my_uploads(
             "created_at": sw.created_at,
             "is_latest_version": sw.is_latest_version,
             "parent_software_id": sw.parent_software_id,
+            "category_id": sw.category_id,
         })
 
     return result
@@ -403,6 +405,57 @@ def delete_software(
 
     db.delete(software)
     db.commit()
+
+
+class SoftwareUpdate(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    price: Optional[float] = None
+    category_id: Optional[int] = None
+    license: Optional[str] = None
+
+
+@router.patch("/{software_id}")
+def update_software(
+    software_id: int,
+    body: SoftwareUpdate,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Update software metadata. Owner only."""
+    software = db.query(models.Software).filter(models.Software.id == software_id).first()
+    if not software:
+        raise HTTPException(status_code=404, detail="Software not found")
+    if software.developer_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized to edit this software")
+
+    if body.title is not None:
+        software.title = body.title
+    if body.description is not None:
+        software.description = body.description
+    if body.price is not None:
+        software.price = body.price
+    if body.category_id is not None:
+        category = db.query(models.Category).filter(models.Category.id == body.category_id).first()
+        if not category:
+            raise HTTPException(status_code=404, detail="Category not found")
+        software.category_id = body.category_id
+    if body.license is not None:
+        software.license = body.license
+
+    db.commit()
+    db.refresh(software)
+    return {
+        "id": software.id,
+        "title": software.title,
+        "description": software.description,
+        "version": software.version,
+        "license": software.license,
+        "price": software.price,
+        "price_type": software.price_type,
+        "category_id": software.category_id,
+        "status": software.status,
+    }
 
 
 @router.post("/{software_id}/upload-version", status_code=status.HTTP_201_CREATED)

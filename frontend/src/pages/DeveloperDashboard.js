@@ -3,12 +3,31 @@ import { useNavigate } from 'react-router-dom';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
 } from 'recharts';
-import { getMyUploads, deleteSoftware, getSoftwareStats } from '../services/api';
+import api, { getMyUploads, deleteSoftware, getSoftwareStats } from '../services/api';
 
 const STATUS_STYLE = {
   pending:  { background: '#fff3cd', color: '#856404' },
   approved: { background: '#d4edda', color: '#155724' },
   rejected: { background: '#f8d7da', color: '#721c24' },
+};
+
+const LICENSES = ['MIT', 'Apache 2.0', 'GPL v3', 'BSD 2-Clause', 'Proprietary / Commercial', 'Freeware'];
+
+const inputStyle = {
+  width: '100%',
+  padding: '8px 12px',
+  fontSize: '14px',
+  border: '1px solid #dee2e6',
+  borderRadius: '4px',
+  boxSizing: 'border-box',
+};
+
+const labelStyle = {
+  display: 'block',
+  marginBottom: '5px',
+  fontSize: '13px',
+  fontWeight: '600',
+  color: '#636e72',
 };
 
 function DeveloperDashboard() {
@@ -23,6 +42,12 @@ function DeveloperDashboard() {
   const [statsLoading, setStatsLoading] = useState(false);
   const [statsError, setStatsError] = useState(null);
 
+  const [editingSw, setEditingSw] = useState(null);
+  const [editForm, setEditForm] = useState({});
+  const [editSaving, setEditSaving] = useState(false);
+  const [editError, setEditError] = useState(null);
+  const [categories, setCategories] = useState([]);
+
   const fetchUploads = () => {
     setLoading(true);
     getMyUploads()
@@ -33,9 +58,13 @@ function DeveloperDashboard() {
       });
   };
 
-  useEffect(() => { fetchUploads(); }, []);
+  useEffect(() => {
+    fetchUploads();
+    api.get('/categories').then(r => setCategories(r.data)).catch(() => {});
+  }, []);
 
   const handleRowClick = (sw) => {
+    if (editingSw) return;
     if (selectedSw?.id === sw.id) {
       setSelectedSw(null);
       setStats([]);
@@ -60,11 +89,55 @@ function DeveloperDashboard() {
     try {
       await deleteSoftware(sw.id);
       if (selectedSw?.id === sw.id) { setSelectedSw(null); setStats([]); }
+      if (editingSw?.id === sw.id) { setEditingSw(null); }
       fetchUploads();
     } catch (err) {
       alert(err.response?.data?.detail || 'Delete failed');
     } finally {
       setDeleting(null);
+    }
+  };
+
+  const handleEditOpen = (e, sw) => {
+    e.stopPropagation();
+    setSelectedSw(null);
+    setStats([]);
+    setEditingSw(sw);
+    setEditError(null);
+    setEditForm({
+      title: sw.title || '',
+      description: sw.description || '',
+      license: sw.license || '',
+      category_id: sw.category_id ? String(sw.category_id) : '',
+      price: sw.price != null ? String(sw.price) : '',
+    });
+  };
+
+  const handleEditCancel = () => {
+    setEditingSw(null);
+    setEditError(null);
+  };
+
+  const handleEditSave = async () => {
+    setEditSaving(true);
+    setEditError(null);
+    try {
+      const payload = {
+        title: editForm.title.trim() || undefined,
+        description: editForm.description.trim() || undefined,
+        license: editForm.license || undefined,
+        category_id: editForm.category_id ? parseInt(editForm.category_id) : undefined,
+        price: editForm.price !== '' ? parseFloat(editForm.price) : undefined,
+      };
+      // Remove undefined keys so they're not sent
+      Object.keys(payload).forEach(k => payload[k] === undefined && delete payload[k]);
+      await api.patch(`/software/${editingSw.id}`, payload);
+      setEditingSw(null);
+      fetchUploads();
+    } catch (err) {
+      setEditError(err.response?.data?.detail || 'Save failed');
+    } finally {
+      setEditSaving(false);
     }
   };
 
@@ -111,18 +184,19 @@ function DeveloperDashboard() {
             <tbody>
               {uploads.map((sw, i) => {
                 const isSelected = selectedSw?.id === sw.id;
+                const isEditing = editingSw?.id === sw.id;
                 return (
                   <tr
                     key={sw.id}
                     onClick={() => handleRowClick(sw)}
                     style={{
                       borderBottom: i < uploads.length - 1 ? '1px solid #f0f0f0' : 'none',
-                      cursor: 'pointer',
-                      background: isSelected ? '#f0fffe' : 'white',
+                      cursor: editingSw ? 'default' : 'pointer',
+                      background: isEditing ? '#fff8e1' : isSelected ? '#f0fffe' : 'white',
                       transition: 'background 0.15s'
                     }}
-                    onMouseEnter={e => { if (!isSelected) e.currentTarget.style.background = '#f8f9fa'; }}
-                    onMouseLeave={e => { e.currentTarget.style.background = isSelected ? '#f0fffe' : 'white'; }}
+                    onMouseEnter={e => { if (!isSelected && !isEditing && !editingSw) e.currentTarget.style.background = '#f8f9fa'; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = isEditing ? '#fff8e1' : isSelected ? '#f0fffe' : 'white'; }}
                   >
                     <td style={{ padding: '14px 16px', fontWeight: '600', color: '#2d3436' }}>
                       {sw.title}
@@ -151,22 +225,39 @@ function DeveloperDashboard() {
                         : <span style={{ color: '#bbb' }}>—</span>}
                     </td>
                     <td style={{ padding: '14px 16px', textAlign: 'right' }}>
-                      <button
-                        onClick={(e) => handleDelete(e, sw)}
-                        disabled={deleting === sw.id}
-                        style={{
-                          padding: '6px 14px',
-                          background: deleting === sw.id ? '#ccc' : '#ff6b6b',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: '4px',
-                          fontSize: '13px',
-                          fontWeight: '600',
-                          cursor: deleting === sw.id ? 'not-allowed' : 'pointer'
-                        }}
-                      >
-                        {deleting === sw.id ? 'Deleting…' : 'Delete'}
-                      </button>
+                      <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                        <button
+                          onClick={(e) => handleEditOpen(e, sw)}
+                          style={{
+                            padding: '6px 14px',
+                            background: isEditing ? '#f39c12' : '#0984e3',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '4px',
+                            fontSize: '13px',
+                            fontWeight: '600',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={(e) => handleDelete(e, sw)}
+                          disabled={deleting === sw.id}
+                          style={{
+                            padding: '6px 14px',
+                            background: deleting === sw.id ? '#ccc' : '#ff6b6b',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '4px',
+                            fontSize: '13px',
+                            fontWeight: '600',
+                            cursor: deleting === sw.id ? 'not-allowed' : 'pointer'
+                          }}
+                        >
+                          {deleting === sw.id ? 'Deleting…' : 'Delete'}
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );
@@ -176,12 +267,123 @@ function DeveloperDashboard() {
         </div>
       )}
 
-      {/* Stats panel - shown when a row is selected */}
-      {selectedSw && (
+      {/* Edit panel */}
+      {editingSw && (
         <div style={{ marginTop: '30px', background: 'white', border: '1px solid #e0e0e0', borderRadius: '8px', padding: '24px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
             <h2 style={{ margin: 0, fontSize: '18px', color: '#2d3436' }}>
-              Downloads over time - <span style={{ color: '#4ecdc4' }}>{selectedSw.title}</span>
+              Edit - <span style={{ color: '#4ecdc4' }}>{editingSw.title}</span>
+            </h2>
+            <button
+              onClick={handleEditCancel}
+              style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', color: '#999', lineHeight: 1 }}
+            >
+              ×
+            </button>
+          </div>
+
+          {editError && (
+            <div style={{ marginBottom: '16px', padding: '10px 14px', background: '#f8d7da', border: '1px solid #f5c6cb', borderRadius: '4px', color: '#721c24', fontSize: '14px' }}>
+              {editError}
+            </div>
+          )}
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+            <div>
+              <label style={labelStyle}>Title</label>
+              <input
+                style={inputStyle}
+                value={editForm.title}
+                onChange={e => setEditForm(f => ({ ...f, title: e.target.value }))}
+              />
+            </div>
+            <div>
+              <label style={labelStyle}>License</label>
+              <select
+                style={inputStyle}
+                value={editForm.license}
+                onChange={e => setEditForm(f => ({ ...f, license: e.target.value }))}
+              >
+                <option value="">— select —</option>
+                {LICENSES.map(l => <option key={l} value={l}>{l}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={labelStyle}>Category</label>
+              <select
+                style={inputStyle}
+                value={editForm.category_id}
+                onChange={e => setEditForm(f => ({ ...f, category_id: e.target.value }))}
+              >
+                <option value="">— select —</option>
+                {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={labelStyle}>Price (leave blank for free)</label>
+              <input
+                style={inputStyle}
+                type="number"
+                min="0"
+                step="0.01"
+                value={editForm.price}
+                onChange={e => setEditForm(f => ({ ...f, price: e.target.value }))}
+                placeholder="0.00"
+              />
+            </div>
+          </div>
+
+          <div style={{ marginBottom: '20px' }}>
+            <label style={labelStyle}>Description</label>
+            <textarea
+              style={{ ...inputStyle, height: '100px', resize: 'vertical' }}
+              value={editForm.description}
+              onChange={e => setEditForm(f => ({ ...f, description: e.target.value }))}
+            />
+          </div>
+
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <button
+              onClick={handleEditSave}
+              disabled={editSaving}
+              style={{
+                padding: '9px 24px',
+                background: editSaving ? '#b2bec3' : '#00b894',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                fontSize: '14px',
+                fontWeight: '600',
+                cursor: editSaving ? 'not-allowed' : 'pointer'
+              }}
+            >
+              {editSaving ? 'Saving…' : 'Save'}
+            </button>
+            <button
+              onClick={handleEditCancel}
+              disabled={editSaving}
+              style={{
+                padding: '9px 24px',
+                background: 'white',
+                color: '#636e72',
+                border: '1px solid #dee2e6',
+                borderRadius: '4px',
+                fontSize: '14px',
+                cursor: 'pointer'
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Stats panel */}
+      {selectedSw && !editingSw && (
+        <div style={{ marginTop: '30px', background: 'white', border: '1px solid #e0e0e0', borderRadius: '8px', padding: '24px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+            <h2 style={{ margin: 0, fontSize: '18px', color: '#2d3436' }}>
+              Downloads over time — <span style={{ color: '#4ecdc4' }}>{selectedSw.title}</span>
             </h2>
             <button
               onClick={() => { setSelectedSw(null); setStats([]); }}
@@ -207,7 +409,7 @@ function DeveloperDashboard() {
 
           {!statsLoading && !statsError && stats.length === 1 && (
             <p style={{ textAlign: 'center', color: '#999', padding: '40px 0' }}>
-              Only 1 download on {stats[0].date} - not enough data to plot a trend.
+              Only 1 download on {stats[0].date} — not enough data to plot a trend.
             </p>
           )}
 
