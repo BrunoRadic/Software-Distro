@@ -1,8 +1,25 @@
 import React, { useState } from 'react';
+import api from '../services/api';
+
+const LICENSE_OPTIONS = [
+  'MIT', 'Apache 2.0', 'GPL v3', 'BSD 2-Clause', 'Proprietary / Commercial', 'Freeware'
+];
 
 function SoftwareAdminCard({ software, onApprove, onReject, onDelete }) {
-  const [pendingAction, setPendingAction] = useState(null); // 'approve' | 'reject' | 'delete'
+  const [pendingAction, setPendingAction] = useState(null);
   const [error, setError] = useState(null);
+  const [editOpen, setEditOpen] = useState(false);
+  const [formData, setFormData] = useState({
+    title: software.title || '',
+    description: software.description || '',
+    price: software.price != null ? String(software.price) : '',
+    category_id: software.category_id ? String(software.category_id) : '',
+    license: software.license || '',
+  });
+  const [categories, setCategories] = useState([]);
+  const [saving, setSaving] = useState(false);
+  const [editError, setEditError] = useState(null);
+  const [localData, setLocalData] = useState(software);
 
   const confirmLabels = {
     approve: 'Approve this software?',
@@ -22,6 +39,50 @@ function SoftwareAdminCard({ software, onApprove, onReject, onDelete }) {
     setPendingAction(null);
   };
 
+  const openEdit = async () => {
+    if (!editOpen) {
+      try {
+        const res = await api.get('/categories');
+        setCategories(res.data);
+      } catch (e) {}
+      setPendingAction(null);
+      setEditError(null);
+    }
+    setEditOpen(v => !v);
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    setEditError(null);
+    try {
+      const payload = {};
+      if (formData.title) payload.title = formData.title;
+      if (formData.description) payload.description = formData.description;
+      if (formData.license) payload.license = formData.license;
+      if (formData.category_id) payload.category_id = parseInt(formData.category_id);
+      if (formData.price !== '') payload.price = parseFloat(formData.price);
+
+      const res = await api.patch(`/software/${software.id}`, payload);
+      const updatedCat = categories.find(c => c.id === res.data.category_id);
+      setLocalData(prev => ({
+        ...prev,
+        title: res.data.title,
+        description: res.data.description,
+        price: res.data.price,
+        category_id: res.data.category_id,
+        license: res.data.license,
+        category: updatedCat
+          ? { id: updatedCat.id, name: updatedCat.name }
+          : prev.category,
+      }));
+      setEditOpen(false);
+    } catch (e) {
+      setEditError(e.response?.data?.detail || e.message || 'Save failed');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const getStatusBadge = (status) => {
     const styles = {
       pending: { background: '#fff3cd', color: '#856404' },
@@ -38,11 +99,6 @@ function SoftwareAdminCard({ software, onApprove, onReject, onDelete }) {
     );
   };
 
-  const formatFileSize = (bytes) => {
-    if (!bytes) return 'N/A';
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  };
-
   return (
     <div style={{
       background: 'white', border: '1px solid #e0e0e0', borderRadius: '8px',
@@ -55,14 +111,14 @@ function SoftwareAdminCard({ software, onApprove, onReject, onDelete }) {
       }}>
         <div>
           <h3 style={{ margin: '0 0 8px 0', fontSize: '20px', color: '#2d3436' }}>
-            {software.title}
+            {localData.title}
           </h3>
           <div style={{ display: 'flex', gap: '15px', fontSize: '14px', color: '#636e72' }}>
-            <span>v{software.version}</span>
-            <span>{software.os_compatibility}</span>
+            <span>v{localData.version}</span>
+            <span>{localData.os_compatibility}</span>
           </div>
         </div>
-        {getStatusBadge(software.status)}
+        {getStatusBadge(localData.status)}
       </div>
 
       {/* Description */}
@@ -70,7 +126,7 @@ function SoftwareAdminCard({ software, onApprove, onReject, onDelete }) {
         margin: '0 0 15px 0', color: '#636e72', fontSize: '14px',
         lineHeight: '1.5', maxHeight: '60px', overflow: 'hidden'
       }}>
-        {software.description || 'No description'}
+        {localData.description || 'No description'}
       </p>
 
       {/* Meta Info */}
@@ -78,11 +134,11 @@ function SoftwareAdminCard({ software, onApprove, onReject, onDelete }) {
         display: 'flex', gap: '20px', marginBottom: '15px', paddingBottom: '15px',
         borderBottom: '1px solid #f0f0f0', fontSize: '13px', color: '#636e72'
       }}>
-        <span>Developer: <strong>{software?.developer?.username || 'Unknown'}</strong></span>
-        <span>Category: <strong>{software.category?.name || 'N/A'}</strong></span>
-        <span>Downloads: <strong>{software.download_count}</strong></span>
-        <span>License: <strong>{software.license || 'N/A'}</strong></span>
-        <span>{software.price_type === 'free' ? 'Free' : `$${software.price || '?'}`}</span>
+        <span>Developer: <strong>{localData?.developer?.username || 'Unknown'}</strong></span>
+        <span>Category: <strong>{localData.category?.name || 'N/A'}</strong></span>
+        <span>Downloads: <strong>{localData.download_count}</strong></span>
+        <span>License: <strong>{localData.license || 'N/A'}</strong></span>
+        <span>{localData.price_type === 'free' ? 'Free' : `$${localData.price || '?'}`}</span>
       </div>
 
       {/* Error */}
@@ -129,7 +185,7 @@ function SoftwareAdminCard({ software, onApprove, onReject, onDelete }) {
       ) : (
         /* Action Buttons */
         <div style={{ display: 'flex', gap: '10px' }}>
-          {software.status !== 'approved' && (
+          {localData.status !== 'approved' && (
             <button
               onClick={() => setPendingAction('approve')}
               style={{
@@ -141,7 +197,7 @@ function SoftwareAdminCard({ software, onApprove, onReject, onDelete }) {
               Approve
             </button>
           )}
-          {software.status !== 'rejected' && software.status !== 'approved' && (
+          {localData.status !== 'rejected' && localData.status !== 'approved' && (
             <button
               onClick={() => setPendingAction('reject')}
               style={{
@@ -154,15 +210,150 @@ function SoftwareAdminCard({ software, onApprove, onReject, onDelete }) {
             </button>
           )}
           <button
-            onClick={() => setPendingAction('delete')}
+            onClick={openEdit}
             style={{
-              padding: '8px 16px', background: '#dc3545', color: 'white',
+              padding: '8px 16px', background: '#6c757d', color: 'white',
               border: 'none', borderRadius: '4px', cursor: 'pointer',
               fontWeight: '500', fontSize: '14px', marginLeft: 'auto'
             }}
           >
+            {editOpen ? 'Cancel Edit' : 'Edit'}
+          </button>
+          <button
+            onClick={() => { setEditOpen(false); setPendingAction('delete'); }}
+            style={{
+              padding: '8px 16px', background: '#dc3545', color: 'white',
+              border: 'none', borderRadius: '4px', cursor: 'pointer',
+              fontWeight: '500', fontSize: '14px'
+            }}
+          >
             Delete
           </button>
+        </div>
+      )}
+
+      {/* Inline Edit Form */}
+      {editOpen && !pendingAction && (
+        <div style={{
+          marginTop: '15px', padding: '15px', background: '#f8f9fa',
+          borderRadius: '4px', border: '1px solid #dee2e6'
+        }}>
+          {editError && (
+            <div style={{
+              marginBottom: '10px', padding: '8px 12px', background: '#f8d7da',
+              border: '1px solid #f5c6cb', borderRadius: '4px', color: '#721c24', fontSize: '13px'
+            }}>
+              {editError}
+            </div>
+          )}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div>
+              <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', marginBottom: '4px', color: '#2d3436' }}>
+                Title
+              </label>
+              <input
+                type="text"
+                value={formData.title}
+                onChange={e => setFormData(f => ({ ...f, title: e.target.value }))}
+                style={{
+                  width: '100%', padding: '8px 10px', border: '1px solid #dee2e6',
+                  borderRadius: '4px', fontSize: '14px', boxSizing: 'border-box'
+                }}
+              />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', marginBottom: '4px', color: '#2d3436' }}>
+                Description
+              </label>
+              <textarea
+                value={formData.description}
+                onChange={e => setFormData(f => ({ ...f, description: e.target.value }))}
+                rows={3}
+                style={{
+                  width: '100%', padding: '8px 10px', border: '1px solid #dee2e6',
+                  borderRadius: '4px', fontSize: '14px', boxSizing: 'border-box', resize: 'vertical'
+                }}
+              />
+            </div>
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <div style={{ flex: 1 }}>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', marginBottom: '4px', color: '#2d3436' }}>
+                  Category
+                </label>
+                <select
+                  value={formData.category_id}
+                  onChange={e => setFormData(f => ({ ...f, category_id: e.target.value }))}
+                  style={{
+                    width: '100%', padding: '8px 10px', border: '1px solid #dee2e6',
+                    borderRadius: '4px', fontSize: '14px', boxSizing: 'border-box'
+                  }}
+                >
+                  <option value="">Select category</option>
+                  {categories.map(c => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div style={{ flex: 1 }}>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', marginBottom: '4px', color: '#2d3436' }}>
+                  License
+                </label>
+                <select
+                  value={formData.license}
+                  onChange={e => setFormData(f => ({ ...f, license: e.target.value }))}
+                  style={{
+                    width: '100%', padding: '8px 10px', border: '1px solid #dee2e6',
+                    borderRadius: '4px', fontSize: '14px', boxSizing: 'border-box'
+                  }}
+                >
+                  <option value="">Select license</option>
+                  {LICENSE_OPTIONS.map(l => (
+                    <option key={l} value={l}>{l}</option>
+                  ))}
+                </select>
+              </div>
+              <div style={{ flex: 1 }}>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', marginBottom: '4px', color: '#2d3436' }}>
+                  Price
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={formData.price}
+                  onChange={e => setFormData(f => ({ ...f, price: e.target.value }))}
+                  placeholder="0.00"
+                  style={{
+                    width: '100%', padding: '8px 10px', border: '1px solid #dee2e6',
+                    borderRadius: '4px', fontSize: '14px', boxSizing: 'border-box'
+                  }}
+                />
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => { setEditOpen(false); setEditError(null); }}
+                style={{
+                  padding: '8px 16px', background: 'white', color: '#636e72',
+                  border: '1px solid #dee2e6', borderRadius: '4px',
+                  cursor: 'pointer', fontSize: '14px'
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSave}
+                disabled={saving}
+                style={{
+                  padding: '8px 16px', background: '#007bff', color: 'white',
+                  border: 'none', borderRadius: '4px', cursor: saving ? 'not-allowed' : 'pointer',
+                  fontWeight: '500', fontSize: '14px', opacity: saving ? 0.7 : 1
+                }}
+              >
+                {saving ? 'Saving...' : 'Save'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

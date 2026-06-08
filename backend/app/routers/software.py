@@ -415,7 +415,7 @@ def update_software(
     software = db.query(models.Software).filter(models.Software.id == software_id).first()
     if not software:
         raise HTTPException(status_code=404, detail="Software not found")
-    if software.developer_id != current_user.id:
+    if software.developer_id != current_user.id and current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Not authorized to edit this software")
 
     if body.title is not None:
