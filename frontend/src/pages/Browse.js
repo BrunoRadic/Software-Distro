@@ -160,14 +160,18 @@ function Browse() {
                     e.currentTarget.style.borderColor = '#e0e0e0';
                   }}
                 >
-                  {/* Title */}
-                  <h3 style={{ 
-                    margin: '0 0 10px 0',
-                    fontSize: '20px',
-                    color: '#2d3436'
-                  }}>
-                    {app.title}
-                  </h3>
+                  {/* Logo + Title */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '10px' }}>
+                    {app.logo_url ? (
+                      <img src={app.logo_url} alt={`${app.title} logo`}
+                        style={{ width: 44, height: 44, objectFit: 'contain', borderRadius: 6, flexShrink: 0 }} />
+                    ) : (
+                      <div style={{ width: 44, height: 44, borderRadius: 6, background: '#e0e0e0', flexShrink: 0 }} />
+                    )}
+                    <h3 style={{ margin: 0, fontSize: '20px', color: '#2d3436' }}>
+                      {app.title}
+                    </h3>
+                  </div>
 
                   {/* Description */}
                   <p style={{ 

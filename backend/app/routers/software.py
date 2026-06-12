@@ -16,6 +16,30 @@ from app.validators import validate_file, validate_os_compatibility
 
 router = APIRouter(prefix="/software", tags=["software"])
 
+ALLOWED_IMAGE_EXTENSIONS = {'.jpg', '.jpeg', '.png'}
+MAX_IMAGE_SIZE = 5 * 1024 * 1024  # 5 MB
+
+
+async def _upload_image(file: UploadFile, prefix: str) -> str:
+    ext = os.path.splitext(file.filename)[1].lower()
+    if ext not in ALLOWED_IMAGE_EXTENSIONS:
+        raise HTTPException(status_code=400, detail="Only JPG and PNG images are allowed")
+    await file.seek(0)
+    data = await file.read()
+    if not data:
+        raise HTTPException(status_code=400, detail="File is empty or could not be read")
+    if len(data) > MAX_IMAGE_SIZE:
+        raise HTTPException(status_code=400, detail="Image must be under 5 MB")
+    temp_path = f"/tmp/{uuid.uuid4()}{ext}"
+    with open(temp_path, "wb") as f:
+        f.write(data)
+    object_name = f"{prefix}/{uuid.uuid4()}{ext}"
+    if not storage.upload_file_to_storage(temp_path, object_name):
+        os.remove(temp_path)
+        raise HTTPException(status_code=500, detail="Image upload failed")
+    os.remove(temp_path)
+    return object_name
+
 
 async def _process_upload(file: UploadFile) -> tuple[str, int, str]:
     """Save file to temp, validate, upload to MinIO. Returns (object_name, file_size, original_filename)."""
@@ -118,7 +142,7 @@ async def upload_software(
     }
 
 
-@router.get("/public", response_model=List[SoftwareResponse])
+@router.get("/public")
 def list_software_public(
     category_id: Optional[int] = None,
     db: Session = Depends(get_db)
@@ -132,7 +156,40 @@ def list_software_public(
     if category_id:
         query = query.filter(models.Software.category_id == category_id)
 
-    return query.order_by(models.Software.created_at.desc()).all()
+    software_list = query.order_by(models.Software.created_at.desc()).all()
+
+    result = []
+    for sw in software_list:
+        developer = db.query(models.User).filter(models.User.id == sw.developer_id).first()
+        category = db.query(models.Category).filter(models.Category.id == sw.category_id).first()
+
+        logo_url = sw.logo_url
+        if not logo_url and sw.parent_software_id is not None:
+            root = db.query(models.Software).filter(models.Software.id == sw.parent_software_id).first()
+            if root:
+                logo_url = root.logo_url
+
+        result.append({
+            "id": sw.id,
+            "title": sw.title,
+            "description": sw.description,
+            "version": sw.version,
+            "developer_id": sw.developer_id,
+            "category_id": sw.category_id,
+            "os_compatibility": sw.os_compatibility,
+            "license": sw.license,
+            "price_type": sw.price_type,
+            "price": sw.price,
+            "external_link": sw.external_link,
+            "status": sw.status,
+            "download_count": sw.download_count,
+            "created_at": sw.created_at,
+            "logo_url": storage.generate_download_url(logo_url, 86400) if logo_url else None,
+            "screenshot_url": storage.generate_download_url(sw.screenshot_url, 86400) if sw.screenshot_url else None,
+            "developer": {"id": developer.id, "username": developer.username} if developer else None,
+            "category": {"id": category.id, "name": category.name} if category else None,
+        })
+    return result
 
 
 @router.get("", response_model=List[SoftwareResponse])
@@ -179,6 +236,8 @@ def list_software_authenticated(
             "status": sw.status,
             "download_count": sw.download_count,
             "created_at": sw.created_at,
+            "logo_url": storage.generate_download_url(sw.logo_url, 86400) if sw.logo_url else None,
+            "screenshot_url": storage.generate_download_url(sw.screenshot_url, 86400) if sw.screenshot_url else None,
             "developer": {
                 "id": developer.id,
                 "username": developer.username
@@ -208,6 +267,12 @@ def get_my_uploads(
         ratings = db.query(models.Rating).filter(models.Rating.software_id == sw.id).all()
         avg_rating = round(sum(r.score for r in ratings) / len(ratings), 2) if ratings else None
 
+        logo_url = sw.logo_url
+        if not logo_url and sw.parent_software_id is not None:
+            root = db.query(models.Software).filter(models.Software.id == sw.parent_software_id).first()
+            if root:
+                logo_url = root.logo_url
+
         result.append({
             "id": sw.id,
             "title": sw.title,
@@ -226,6 +291,7 @@ def get_my_uploads(
             "is_latest_version": sw.is_latest_version,
             "parent_software_id": sw.parent_software_id,
             "category_id": sw.category_id,
+            "logo_url": logo_url,
         })
 
     return result
@@ -340,6 +406,12 @@ async def get_software(
     developer = db.query(models.User).filter(models.User.id == software.developer_id).first()
     category = db.query(models.Category).filter(models.Category.id == software.category_id).first()
 
+    logo_url = software.logo_url
+    if not logo_url and software.parent_software_id is not None:
+        root = db.query(models.Software).filter(models.Software.id == software.parent_software_id).first()
+        if root:
+            logo_url = root.logo_url
+
     return {
         "id": software.id,
         "title": software.title,
@@ -353,6 +425,8 @@ async def get_software(
         "status": software.status,
         "created_at": software.created_at,
         "external_link": software.external_link,
+        "logo_url": storage.generate_download_url(logo_url, 86400) if logo_url else None,
+        "screenshot_url": storage.generate_download_url(software.screenshot_url, 86400) if software.screenshot_url else None,
         "developer": {
             "id": developer.id,
             "username": developer.username
@@ -445,6 +519,35 @@ def update_software(
         "category_id": software.category_id,
         "status": software.status,
     }
+
+
+@router.post("/{software_id}/logo")
+async def upload_logo(
+    software_id: int,
+    file: UploadFile = File(...),
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Upload or replace logo. Owner or admin only. Logo is stored on the root row."""
+    software = db.query(models.Software).filter(models.Software.id == software_id).first()
+    if not software:
+        raise HTTPException(status_code=404, detail="Software not found")
+    if software.developer_id != current_user.id and current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    if software.parent_software_id is not None:
+        root = db.query(models.Software).filter(models.Software.id == software.parent_software_id).first()
+        if root:
+            software = root
+
+    if software.logo_url:
+        storage.delete_file_from_storage(software.logo_url)
+
+    object_name = await _upload_image(file, "logos")
+    software.logo_url = object_name
+    db.commit()
+
+    return {"logo_url": storage.generate_download_url(object_name, 86400)}
 
 
 @router.post("/{software_id}/upload-version", status_code=status.HTTP_201_CREATED)

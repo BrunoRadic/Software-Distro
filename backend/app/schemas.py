@@ -51,6 +51,9 @@ class SoftwareResponse(BaseModel):
     download_count: int
     created_at: datetime
 
+    logo_url: Optional[str] = None
+    screenshot_url: Optional[str] = None
+
     developer: Optional[DeveloperInfo] = None
     category: Optional[CategoryInfo] = None
 

@@ -28,6 +28,7 @@ function UploadSoftware() {
   const [uploading, setUploading] = useState(false);
   const [osSupport, setOsSupport] = useState({ Windows: false, Mac: false, Linux: false });
   const [osFiles, setOsFiles] = useState({ Windows: null, Mac: null, Linux: null });
+  const [logoFile, setLogoFile] = useState(null);
   const [formError, setFormError] = useState(null);
 
   useEffect(() => {
@@ -89,9 +90,18 @@ function UploadSoftware() {
 
     setUploading(true);
     try {
-      await api.post('/software/upload', data, {
+      const res = await api.post('/software/upload', data, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
+      if (logoFile) {
+        try {
+          const logoForm = new FormData();
+          logoForm.append('file', logoFile);
+          await api.post(`/software/${res.data.software_id}/logo`, logoForm, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+          });
+        } catch (_) {}
+      }
       navigate('/browse');
     } catch (err) {
       console.error('Upload error:', err);
@@ -271,6 +281,33 @@ function UploadSoftware() {
           <input type="url" name="external_link" value={formData.external_link}
             onChange={handleChange} placeholder="e.g., https://github.com/yourproject"
             style={inputStyle} />
+        </div>
+
+        {/* Logo */}
+        <div style={{ marginBottom: '20px' }}>
+          <label style={labelStyle}>Logo (optional — JPG or PNG, max 5 MB)</label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <label style={{
+              display: 'inline-block', padding: '8px 16px',
+              background: '#f8f9fa', border: '2px dashed #dee2e6',
+              borderRadius: '4px', cursor: 'pointer', color: '#636e72',
+              fontWeight: '500', fontSize: '14px', transition: 'all 0.2s'
+            }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = '#4ecdc4'; e.currentTarget.style.background = '#e8f8f7'; }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = '#dee2e6'; e.currentTarget.style.background = '#f8f9fa'; }}
+            >
+              Choose logo image
+              <input type="file" accept="image/jpeg,image/png" style={{ display: 'none' }}
+                onChange={e => setLogoFile(e.target.files[0] || null)} />
+            </label>
+            {logoFile ? (
+              <span style={{ fontSize: '14px', color: '#155724', fontWeight: '500' }}>
+                {logoFile.name} ({(logoFile.size / (1024 * 1024)).toFixed(2)} MB)
+              </span>
+            ) : (
+              <span style={{ fontSize: '13px', color: '#999' }}>No file chosen</span>
+            )}
+          </div>
         </div>
 
         {/* Error */}

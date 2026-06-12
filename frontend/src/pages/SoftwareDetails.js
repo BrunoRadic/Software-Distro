@@ -406,9 +406,17 @@ function SoftwareDetails() {
         borderRadius: '8px', padding: '40px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)'
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px', marginBottom: '20px' }}>
-          <h1 style={{ margin: 0, fontSize: '36px', color: '#2d3436' }}>
-            {software?.title}
-          </h1>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            {software?.logo_url ? (
+              <img src={software.logo_url} alt={`${software.title} logo`}
+                style={{ width: 72, height: 72, objectFit: 'contain', borderRadius: 10, flexShrink: 0 }} />
+            ) : (
+              <div style={{ width: 72, height: 72, borderRadius: 10, background: '#e0e0e0', flexShrink: 0 }} />
+            )}
+            <h1 style={{ margin: 0, fontSize: '36px', color: '#2d3436' }}>
+              {software?.title}
+            </h1>
+          </div>
           {avgScore !== null && (
             <div style={{ textAlign: 'right' }}>
               <span style={{ fontSize: '28px', color: '#f39c12', fontWeight: '700' }}>★ {avgScore}</span>

@@ -44,6 +44,7 @@ function DeveloperDashboard() {
 
   const [editingSw, setEditingSw] = useState(null);
   const [editForm, setEditForm] = useState({});
+  const [editLogoFile, setEditLogoFile] = useState(null);
   const [editSaving, setEditSaving] = useState(false);
   const [editError, setEditError] = useState(null);
   const [categories, setCategories] = useState([]);
@@ -116,6 +117,7 @@ function DeveloperDashboard() {
   const handleEditCancel = () => {
     setEditingSw(null);
     setEditError(null);
+    setEditLogoFile(null);
   };
 
   const handleEditSave = async () => {
@@ -132,7 +134,15 @@ function DeveloperDashboard() {
       // Remove undefined keys so they're not sent
       Object.keys(payload).forEach(k => payload[k] === undefined && delete payload[k]);
       await api.patch(`/software/${editingSw.id}`, payload);
+      if (editLogoFile) {
+        const logoForm = new FormData();
+        logoForm.append('file', editLogoFile);
+        await api.post(`/software/${editingSw.id}/logo`, logoForm, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
+      }
       setEditingSw(null);
+      setEditLogoFile(null);
       fetchUploads();
     } catch (err) {
       setEditError(err.response?.data?.detail || 'Save failed');
@@ -340,6 +350,32 @@ function DeveloperDashboard() {
               value={editForm.description}
               onChange={e => setEditForm(f => ({ ...f, description: e.target.value }))}
             />
+          </div>
+
+          <div style={{ marginBottom: '20px' }}>
+            <label style={labelStyle}>Replace Logo (optional — JPG or PNG, max 5 MB)</label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              {editingSw.logo_url && !editLogoFile && (
+                <img src={editingSw.logo_url} alt="current logo"
+                  style={{ width: 40, height: 40, objectFit: 'contain', borderRadius: 4, border: '1px solid #e0e0e0' }} />
+              )}
+              <label style={{
+                display: 'inline-block', padding: '7px 14px',
+                background: '#f8f9fa', border: '1px dashed #dee2e6',
+                borderRadius: '4px', cursor: 'pointer', color: '#636e72',
+                fontSize: '13px', fontWeight: '500'
+              }}>
+                {editLogoFile ? editLogoFile.name : (editingSw.logo_url ? 'Replace logo…' : 'Choose logo…')}
+                <input type="file" accept="image/jpeg,image/png" style={{ display: 'none' }}
+                  onChange={e => setEditLogoFile(e.target.files[0] || null)} />
+              </label>
+              {editLogoFile && (
+                <button onClick={() => setEditLogoFile(null)}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#999', fontSize: '16px', lineHeight: 1 }}>
+                  ×
+                </button>
+              )}
+            </div>
           </div>
 
           <div style={{ display: 'flex', gap: '10px' }}>
