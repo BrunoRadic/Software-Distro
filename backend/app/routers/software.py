@@ -221,6 +221,12 @@ def list_software_authenticated(
         developer = db.query(models.User).filter(models.User.id == sw.developer_id).first()
         category = db.query(models.Category).filter(models.Category.id == sw.category_id).first()
 
+        logo_url = sw.logo_url
+        if not logo_url and sw.parent_software_id is not None:
+            root = db.query(models.Software).filter(models.Software.id == sw.parent_software_id).first()
+            if root:
+                logo_url = root.logo_url
+
         sw_dict = {
             "id": sw.id,
             "title": sw.title,
@@ -236,7 +242,7 @@ def list_software_authenticated(
             "status": sw.status,
             "download_count": sw.download_count,
             "created_at": sw.created_at,
-            "logo_url": storage.generate_download_url(sw.logo_url, 86400) if sw.logo_url else None,
+            "logo_url": storage.generate_download_url(logo_url, 86400) if logo_url else None,
             "screenshot_url": storage.generate_download_url(sw.screenshot_url, 86400) if sw.screenshot_url else None,
             "developer": {
                 "id": developer.id,
@@ -529,25 +535,58 @@ async def upload_logo(
     db: Session = Depends(get_db)
 ):
     """Upload or replace logo. Owner or admin only. Logo is stored on the root row."""
-    software = db.query(models.Software).filter(models.Software.id == software_id).first()
-    if not software:
+    original = db.query(models.Software).filter(models.Software.id == software_id).first()
+    if not original:
         raise HTTPException(status_code=404, detail="Software not found")
-    if software.developer_id != current_user.id and current_user.role != "admin":
+    if original.developer_id != current_user.id and current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Not authorized")
 
-    if software.parent_software_id is not None:
-        root = db.query(models.Software).filter(models.Software.id == software.parent_software_id).first()
-        if root:
-            software = root
+    root = original
+    if original.parent_software_id is not None:
+        fetched_root = db.query(models.Software).filter(models.Software.id == original.parent_software_id).first()
+        if fetched_root:
+            root = fetched_root
 
-    if software.logo_url:
-        storage.delete_file_from_storage(software.logo_url)
+    # Clear any stale logo from both the version row and the root row
+    for target in ([root, original] if original is not root else [root]):
+        if target.logo_url:
+            storage.delete_file_from_storage(target.logo_url)
+            target.logo_url = None
 
     object_name = await _upload_image(file, "logos")
-    software.logo_url = object_name
+    root.logo_url = object_name
     db.commit()
 
     return {"logo_url": storage.generate_download_url(object_name, 86400)}
+
+
+@router.delete("/{software_id}/logo", status_code=status.HTTP_204_NO_CONTENT)
+def delete_logo(
+    software_id: int,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Remove logo. Owner or admin only. Clears logo from both the requested row and its root."""
+    original = db.query(models.Software).filter(models.Software.id == software_id).first()
+    if not original:
+        raise HTTPException(status_code=404, detail="Software not found")
+    if original.developer_id != current_user.id and current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    root = original
+    if original.parent_software_id is not None:
+        fetched_root = db.query(models.Software).filter(models.Software.id == original.parent_software_id).first()
+        if fetched_root:
+            root = fetched_root
+
+    # Clear logo from whichever row(s) have it — version rows may carry a stale logo_url
+    # if they were uploaded before the root-resolution invariant was established
+    for target in ([root, original] if original is not root else [root]):
+        if target.logo_url:
+            storage.delete_file_from_storage(target.logo_url)
+            target.logo_url = None
+
+    db.commit()
 
 
 @router.post("/{software_id}/upload-version", status_code=status.HTTP_201_CREATED)

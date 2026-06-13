@@ -120,6 +120,16 @@ function DeveloperDashboard() {
     setEditLogoFile(null);
   };
 
+  const handleEditRemoveLogo = async () => {
+    try {
+      await api.delete(`/software/${editingSw.id}/logo`);
+      setEditingSw(prev => ({ ...prev, logo_url: null }));
+      fetchUploads();
+    } catch (err) {
+      setEditError(err.response?.data?.detail || 'Remove logo failed');
+    }
+  };
+
   const handleEditSave = async () => {
     setEditSaving(true);
     setEditError(null);
@@ -356,8 +366,14 @@ function DeveloperDashboard() {
             <label style={labelStyle}>Replace Logo (optional — JPG or PNG, max 5 MB)</label>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
               {editingSw.logo_url && !editLogoFile && (
-                <img src={editingSw.logo_url} alt="current logo"
-                  style={{ width: 40, height: 40, objectFit: 'contain', borderRadius: 4, border: '1px solid #e0e0e0' }} />
+                <>
+                  <img src={editingSw.logo_url} alt="current logo"
+                    style={{ width: 40, height: 40, objectFit: 'contain', borderRadius: 4, border: '1px solid #e0e0e0' }} />
+                  <button onClick={handleEditRemoveLogo}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#999', fontSize: '18px', lineHeight: 1 }}>
+                    ×
+                  </button>
+                </>
               )}
               <label style={{
                 display: 'inline-block', padding: '7px 14px',

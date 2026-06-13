@@ -17,6 +17,7 @@ function SoftwareAdminCard({ software, onApprove, onReject, onDelete }) {
     license: software.license || '',
   });
   const [categories, setCategories] = useState([]);
+  const [logoFile, setLogoFile] = useState(null);
   const [saving, setSaving] = useState(false);
   const [editError, setEditError] = useState(null);
   const [localData, setLocalData] = useState(software);
@@ -47,8 +48,18 @@ function SoftwareAdminCard({ software, onApprove, onReject, onDelete }) {
       } catch (e) {}
       setPendingAction(null);
       setEditError(null);
+      setLogoFile(null);
     }
     setEditOpen(v => !v);
+  };
+
+  const handleRemoveLogo = async () => {
+    try {
+      await api.delete(`/software/${software.id}/logo`);
+      setLocalData(prev => ({ ...prev, logo_url: null }));
+    } catch (e) {
+      setEditError(e.response?.data?.detail || e.message || 'Remove logo failed');
+    }
   };
 
   const handleSave = async () => {
@@ -64,6 +75,15 @@ function SoftwareAdminCard({ software, onApprove, onReject, onDelete }) {
 
       const res = await api.patch(`/software/${software.id}`, payload);
       const updatedCat = categories.find(c => c.id === res.data.category_id);
+      let newLogoUrl = localData.logo_url;
+      if (logoFile) {
+        const logoForm = new FormData();
+        logoForm.append('file', logoFile);
+        const logoRes = await api.post(`/software/${software.id}/logo`, logoForm, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
+        newLogoUrl = logoRes.data.logo_url;
+      }
       setLocalData(prev => ({
         ...prev,
         title: res.data.title,
@@ -71,10 +91,12 @@ function SoftwareAdminCard({ software, onApprove, onReject, onDelete }) {
         price: res.data.price,
         category_id: res.data.category_id,
         license: res.data.license,
+        logo_url: newLogoUrl,
         category: updatedCat
           ? { id: updatedCat.id, name: updatedCat.name }
           : prev.category,
       }));
+      setLogoFile(null);
       setEditOpen(false);
     } catch (e) {
       setEditError(e.response?.data?.detail || e.message || 'Save failed');
@@ -330,9 +352,44 @@ function SoftwareAdminCard({ software, onApprove, onReject, onDelete }) {
                 />
               </div>
             </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', marginBottom: '4px', color: '#2d3436' }}>
+                Logo
+              </label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                {localData.logo_url && !logoFile && (
+                  <>
+                    <img src={localData.logo_url} alt="current logo"
+                      style={{ width: 36, height: 36, objectFit: 'contain', borderRadius: 4, border: '1px solid #e0e0e0' }} />
+                    <button onClick={e => { e.stopPropagation(); handleRemoveLogo(); }}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#999', fontSize: '18px', lineHeight: 1 }}>
+                      ×
+                    </button>
+                  </>
+                )}
+                <label
+                  onClick={e => e.stopPropagation()}
+                  style={{
+                    display: 'inline-block', padding: '6px 12px',
+                    background: '#f8f9fa', border: '1px dashed #dee2e6',
+                    borderRadius: '4px', cursor: 'pointer', color: '#636e72',
+                    fontSize: '13px', fontWeight: '500'
+                  }}>
+                  {logoFile ? logoFile.name : (localData.logo_url ? 'Replace logo…' : 'Add logo…')}
+                  <input type="file" accept="image/jpeg,image/png" style={{ display: 'none' }}
+                    onChange={e => { e.stopPropagation(); setLogoFile(e.target.files[0] || null); }} />
+                </label>
+                {logoFile && (
+                  <button onClick={e => { e.stopPropagation(); setLogoFile(null); }}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#999', fontSize: '18px', lineHeight: 1 }}>
+                    ×
+                  </button>
+                )}
+              </div>
+            </div>
             <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
               <button
-                onClick={() => { setEditOpen(false); setEditError(null); }}
+                onClick={() => { setEditOpen(false); setEditError(null); setLogoFile(null); }}
                 style={{
                   padding: '8px 16px', background: 'white', color: '#636e72',
                   border: '1px solid #dee2e6', borderRadius: '4px',
