@@ -1,0 +1,71 @@
+version: '3.8'
+
+services:
+  minio:
+    image: minio/minio:latest
+    container_name: software-distro-minio
+    ports:
+      - "9000:9000"      # API port
+      - "9001:9001"      # Console (web UI)
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin123
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
+    networks:
+      - app-network
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: software-distro-postgres
+    ports:
+    - "5432:5432"
+    environment:
+      POSTGRES_DB: software_distro
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - app-network
+
+  backend:
+    build: ./backend
+    container_name: software-distro-backend
+    depends_on:
+      - minio
+      - postgres
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/software_distro
+      SECRET_KEY: secretkey123
+      CORS_ORIGINS: http://localhost:3000
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_PUBLIC_URL: http://localhost:9000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin123
+    ports:
+      - "8000:8000"
+    networks:
+      - app-network
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        REACT_APP_API_URL: http://localhost:8000
+    container_name: software-distro-frontend
+    depends_on:
+      - backend
+    ports:
+      - "3000:80"
+    networks:
+      - app-network
+
+volumes:
+  minio_data:
+  postgres_data:
+
+networks:
+  app-network:
+    driver: bridge
