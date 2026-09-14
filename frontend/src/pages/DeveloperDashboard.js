@@ -435,7 +435,7 @@ function DeveloperDashboard() {
         <div style={{ marginTop: '30px', background: 'white', border: '1px solid #e0e0e0', borderRadius: '8px', padding: '24px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
             <h2 style={{ margin: 0, fontSize: '18px', color: '#2d3436' }}>
-              Downloads over time — <span style={{ color: '#4ecdc4' }}>{selectedSw.title}</span>
+              Downloads over time - <span style={{ color: '#4ecdc4' }}>{selectedSw.title}</span>
             </h2>
             <button
               onClick={() => { setSelectedSw(null); setStats([]); }}

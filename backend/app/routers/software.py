@@ -263,29 +263,45 @@ def get_my_uploads(
     current_user: models.User = Depends(require_developer),
     db: Session = Depends(get_db)
 ):
-    """All software uploaded by the current developer, all statuses, with download_count and avg rating."""
-    software_list = db.query(models.Software).filter(
-        models.Software.developer_id == current_user.id
+    """Root-level software uploaded by the current developer; aggregates across all versions."""
+    roots = db.query(models.Software).filter(
+        models.Software.developer_id == current_user.id,
+        models.Software.parent_software_id == None
     ).order_by(models.Software.created_at.desc()).all()
 
     result = []
-    for sw in software_list:
-        ratings = db.query(models.Rating).filter(models.Rating.software_id == sw.id).all()
+    for sw in roots:
+        family = db.query(models.Software).filter(
+            (models.Software.id == sw.id) |
+            (models.Software.parent_software_id == sw.id)
+        ).all()
+        family_ids = [v.id for v in family]
+
+        total_downloads = sum(v.download_count for v in family)
+
+        ratings = db.query(models.Rating).filter(
+            models.Rating.software_id.in_(family_ids)
+        ).all()
         avg_rating = round(sum(r.score for r in ratings) / len(ratings), 2) if ratings else None
 
-        logo_url = sw.logo_url
-        if not logo_url and sw.parent_software_id is not None:
-            root = db.query(models.Software).filter(models.Software.id == sw.parent_software_id).first()
-            if root:
-                logo_url = root.logo_url
+        latest_approved = next(
+            (v for v in sorted(family, key=lambda v: v.created_at, reverse=True)
+             if v.status == "approved" and v.is_latest_version),
+            None
+        ) or next(
+            (v for v in sorted(family, key=lambda v: v.created_at, reverse=True)
+             if v.status == "approved"),
+            None
+        )
+        display_version = latest_approved.version if latest_approved else sw.version
 
         result.append({
             "id": sw.id,
             "title": sw.title,
             "description": sw.description,
-            "version": sw.version,
+            "version": display_version,
             "status": sw.status,
-            "download_count": sw.download_count,
+            "download_count": total_downloads,
             "average_rating": avg_rating,
             "rating_count": len(ratings),
             "os_compatibility": sw.os_compatibility,
@@ -297,7 +313,7 @@ def get_my_uploads(
             "is_latest_version": sw.is_latest_version,
             "parent_software_id": sw.parent_software_id,
             "category_id": sw.category_id,
-            "logo_url": logo_url,
+            "logo_url": sw.logo_url,
         })
 
     return result
@@ -722,10 +738,18 @@ def get_software_stats(
     if software.developer_id != current_user.id and current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Not authorized to view stats for this software")
 
+    root_id = software.parent_software_id if software.parent_software_id else software.id
+    family_ids = [
+        v.id for v in db.query(models.Software.id).filter(
+            (models.Software.id == root_id) |
+            (models.Software.parent_software_id == root_id)
+        ).all()
+    ]
+
     date_col = cast(models.Download.downloaded_at, Date)
     rows = (
         db.query(date_col.label("date"), func.count().label("count"))
-        .filter(models.Download.software_id == software_id)
+        .filter(models.Download.software_id.in_(family_ids))
         .group_by(date_col)
         .order_by(date_col)
         .all()
