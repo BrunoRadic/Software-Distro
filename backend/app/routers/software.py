@@ -263,45 +263,29 @@ def get_my_uploads(
     current_user: models.User = Depends(require_developer),
     db: Session = Depends(get_db)
 ):
-    """Root-level software uploaded by the current developer; aggregates across all versions."""
-    roots = db.query(models.Software).filter(
-        models.Software.developer_id == current_user.id,
-        models.Software.parent_software_id == None
+    """All software uploaded by the current developer, all statuses, with download_count and avg rating."""
+    software_list = db.query(models.Software).filter(
+        models.Software.developer_id == current_user.id
     ).order_by(models.Software.created_at.desc()).all()
 
     result = []
-    for sw in roots:
-        family = db.query(models.Software).filter(
-            (models.Software.id == sw.id) |
-            (models.Software.parent_software_id == sw.id)
-        ).all()
-        family_ids = [v.id for v in family]
-
-        total_downloads = sum(v.download_count for v in family)
-
-        ratings = db.query(models.Rating).filter(
-            models.Rating.software_id.in_(family_ids)
-        ).all()
+    for sw in software_list:
+        ratings = db.query(models.Rating).filter(models.Rating.software_id == sw.id).all()
         avg_rating = round(sum(r.score for r in ratings) / len(ratings), 2) if ratings else None
 
-        latest_approved = next(
-            (v for v in sorted(family, key=lambda v: v.created_at, reverse=True)
-             if v.status == "approved" and v.is_latest_version),
-            None
-        ) or next(
-            (v for v in sorted(family, key=lambda v: v.created_at, reverse=True)
-             if v.status == "approved"),
-            None
-        )
-        display_version = latest_approved.version if latest_approved else sw.version
+        logo_url = sw.logo_url
+        if not logo_url and sw.parent_software_id is not None:
+            root = db.query(models.Software).filter(models.Software.id == sw.parent_software_id).first()
+            if root:
+                logo_url = root.logo_url
 
         result.append({
             "id": sw.id,
             "title": sw.title,
             "description": sw.description,
-            "version": display_version,
+            "version": sw.version,
             "status": sw.status,
-            "download_count": total_downloads,
+            "download_count": sw.download_count,
             "average_rating": avg_rating,
             "rating_count": len(ratings),
             "os_compatibility": sw.os_compatibility,
@@ -313,7 +297,7 @@ def get_my_uploads(
             "is_latest_version": sw.is_latest_version,
             "parent_software_id": sw.parent_software_id,
             "category_id": sw.category_id,
-            "logo_url": sw.logo_url,
+            "logo_url": logo_url,
         })
 
     return result
@@ -397,8 +381,9 @@ async def download_software(
     if not download_url:
         raise HTTPException(status_code=500, detail="Download URL generation failed")
 
+    root_id = software.parent_software_id if software.parent_software_id else software.id
     download_record = models.Download(
-        software_id=software_id,
+        software_id=root_id,
         user_id=current_user.id,
         software_file_id=sw_file.id,
     )
@@ -738,7 +723,7 @@ def get_software_stats(
     if software.developer_id != current_user.id and current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Not authorized to view stats for this software")
 
-    root_id = software.parent_software_id if software.parent_software_id else software.id
+    root_id = software.parent_software_id if software.parent_software_id else software_id
     family_ids = [
         v.id for v in db.query(models.Software.id).filter(
             (models.Software.id == root_id) |
